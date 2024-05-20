@@ -25,7 +25,7 @@ fn _to_lower(a: UInt8, b:UInt8) -> (Int, Int, Int, Int):
     if a == 195:
         var lower = b >= 128
         var upper = b <= 158
-        return ((0), (lower & upper).to_int() * 32, 0, 2)
+        return ((0), int(lower & upper) * 32, 0, 2)
     elif a == 196:
         if b == 176:
             return ((-91), (-176), 0, 1)
@@ -36,7 +36,7 @@ fn _to_lower(a: UInt8, b:UInt8) -> (Int, Int, Int, Int):
         var even = b & 1 == 0
         alias tail = SIMD[DType.uint8, 8](UInt8(178), UInt8(180), UInt8(182), UInt8(185), UInt8(187), UInt8(189), UInt8(189), UInt8(189))
         var is_tail = SIMD[DType.bool, 1]((tail == b).reduce_or())
-        return ((0), (1) * (is_tail | (lower & upper & even)).to_int(), 0, 2)
+        return ((0), (1) * int(is_tail | (lower & upper & even)), 0, 2)
     elif a == 197:
         if b == 184:
             return ((254), (7), 0, 2)
@@ -45,7 +45,7 @@ fn _to_lower(a: UInt8, b:UInt8) -> (Int, Int, Int, Int):
         var lower = b >= 138
         var upper = b <= 182
         var even = b & 1 == 0
-        return ((0), (1) * (is_special | (lower & upper & even)).to_int(), 0, 2)
+        return ((0), (1) * int(is_special | (lower & upper & even)), 0, 2)
     elif a == 198:
         if b == 129:
             return ((3), (18), 0, 2)
@@ -102,7 +102,7 @@ fn _to_lower(a: UInt8, b:UInt8) -> (Int, Int, Int, Int):
         var l2 = b >= 158
         var h2 = b <= 174
         var is_special = SIMD[DType.bool, 1]((special_1 == b).reduce_or())
-        return ((0), (1) * (is_special | (l1 & h1 & odd) | (l2 & h2 & ~odd)).to_int(), 0, 2)
+        return ((0), (1) * int(is_special | (l1 & h1 & odd) | (l2 & h2 & ~odd)), 0, 2)
     elif a == 200:
         if b == 186:
             return ((26), (-9), 165, 3)
@@ -116,7 +116,7 @@ fn _to_lower(a: UInt8, b:UInt8) -> (Int, Int, Int, Int):
         var h1 = b <= 178
         var even = b & 1 == 0
         var is_special = (b == 187)
-        return ((0), (1) * (is_special | (l1 & h1 & even)).to_int(), 0, 2)
+        return ((0), (1) * int(is_special | (l1 & h1 & even)), 0, 2)
     elif a == 201:
         if b == 131:
             return ((253), (253), 0, 2)
@@ -128,7 +128,7 @@ fn _to_lower(a: UInt8, b:UInt8) -> (Int, Int, Int, Int):
             UInt8(129), UInt8(134), UInt8(136), UInt8(138), 
             UInt8(140), UInt8(142), UInt8(142), UInt8(142),
         )
-        return ((0), (1) * SIMD[DType.uint8, 1]((special_1 == b).reduce_or()).to_int(), 0, 2)
+        return ((0), (1) * int(SIMD[DType.uint8, 1]((special_1 == b).reduce_or())), 0, 2)
     elif a == 205:
         if b == 176 or b == 178 or b == 182:
             return ((0), (1), 0, 2)
@@ -160,7 +160,7 @@ fn _to_lower(a: UInt8, b:UInt8) -> (Int, Int, Int, Int):
         var h1 = b <= 174
         var even = b & 1 == 0
         var is_special = (b == 183 or b == 186)
-        return (0, 1 * (is_special or (l1 & h1 & even)).to_int(), 0, 2)
+        return (0, 1 * int(is_special or (l1 & h1 & even)), 0, 2)
     elif a == 208:
         var l1 = b >= 128
         var h1 = b <= 143
@@ -169,8 +169,8 @@ fn _to_lower(a: UInt8, b:UInt8) -> (Int, Int, Int, Int):
         var l3 = b >= 160
         var h3 = b <= 175
         return (
-            1 * ((l1 & h1) | (l3 & h3)).to_int(), 
-            16 * (l1 & h1).to_int() + 32 * (l2 & h2).to_int() + 224 * (l3 & h3).to_int(), 
+            1 * int((l1 & h1) | (l3 & h3)), 
+            16 * int(l1 & h1) + 32 * int(l2 & h2) + 224 * int(l3 & h3), 
             0, 
             2,
         )
@@ -178,12 +178,12 @@ fn _to_lower(a: UInt8, b:UInt8) -> (Int, Int, Int, Int):
         var l1 = b >= 160
         var h1 = b <= 190
         var even = b & 1 == 0
-        return (0, 1 * (l1 & h1 & even).to_int(), 0, 2)
+        return (0, 1 * int(l1 & h1 & even), 0, 2)
     elif a == 210:
         var l1 = b >= 138
         var h1 = b <= 190
         var even = b & 1 == 0
-        return (0, 1 * ((b == UInt8(128)) | (l1 & h1 & even)).to_int(), 0, 2)
+        return (0, 1 * int((b == UInt8(128)) | (l1 & h1 & even)), 0, 2)
     elif a == 211:
         if b == 128:
             return ((0), (15), 0, 2)
@@ -192,15 +192,15 @@ fn _to_lower(a: UInt8, b:UInt8) -> (Int, Int, Int, Int):
         var odd = b & 1 == 1
         var l2 = b >= 144
         var h2 = b <= 190
-        return (0, 1 * ((l1 & h1 & odd) | (l2 & h2 & ~odd)).to_int(), 0, 2)
+        return (0, 1 * int((l1 & h1 & odd) | (l2 & h2 & ~odd)), 0, 2)
     elif a == 212:
         var l1 = b >= 128
         var h1 = b <= 174
         var even = b & 1 == 0
         var l2 = b >= 177
         var h2 = b <= 191
-        var g1 = (l1 & h1 & even).to_int()
-        var g2 = (l2 & h2).to_int()
+        var g1 = int(l1 & h1 & even)
+        var g2 = int(l2 & h2)
         return (
             1 * g2,
             1 * g1 + 240 * g2, 
@@ -212,8 +212,8 @@ fn _to_lower(a: UInt8, b:UInt8) -> (Int, Int, Int, Int):
         var h1 = b <= 143
         var l2 = b >= 144
         var h2 = b <= 150
-        var g1 = (l1 & h1).to_int()
-        var g2 = (l2 & h2).to_int()
+        var g1 = int(l1 & h1)
+        var g2 = int(l2 & h2)
         return (
             1 * g2,
             48 * g1 + 240 * g2, 
@@ -412,7 +412,7 @@ fn _to_lower(a: UInt8, b:UInt8, c: UInt8, d: UInt8) -> (Int, Int, Int, Int):
 #     var length = len(s)
 #     var p = s._as_ptr().bitcast[DType.uint8]()
 #     while length > 0:
-#         var char_length = ((p.load() >> 7 == 0).cast[DType.uint8]() * 1 + _ctlz(~p.load())).to_int()
+#         var char_length = ((p.load() >> 7 == 0).cast[DType.uint8]() * 1 + _ctlz(~p.load()))
 #         if char_length == 1:
 #             p[0] += _to_lower(p[0])
 #         elif char_length == 2:
@@ -433,15 +433,15 @@ fn _to_lower(a: UInt8, b:UInt8, c: UInt8, d: UInt8) -> (Int, Int, Int, Int):
 #         p += char_length
 #         length -= char_length
 
-fn lower_utf8(p: DTypePointer[DType.int8], bytes: Int) -> String:
+fn lower_utf8(p: DTypePointer[DType.uint8], bytes: Int) -> String:
     '''Given a pointer to the utf-8 encoded string buffer and it's size in bytes, return a new string, where all the chars are in lower case.'''
     var result = DTypePointer[DType.uint8].alloc(bytes // 2 * 3 + 1)
     var added_bytes = 0
-    var cp = p.bitcast[DType.uint8]()
+    var cp = p
     var rest_bytes = bytes
     var resultp = result
     while rest_bytes > 0:
-        var char_length = ((cp.load() >> 7 == 0).cast[DType.uint8]() * 1 + _ctlz(~cp.load())).to_int()
+        var char_length = int((cp.load() >> 7 == 0).cast[DType.uint8]() * 1 + _ctlz(~cp.load()))
         if char_length == 1:
             resultp[0] = cp[0] + _to_lower(cp[0])
             added_bytes += 1
@@ -468,7 +468,7 @@ fn lower_utf8(p: DTypePointer[DType.int8], bytes: Int) -> String:
         rest_bytes -= char_length
         resultp = result + added_bytes
     resultp[0] = 0
-    return String(result.bitcast[DType.int8](), added_bytes + 1)
+    return String(result, added_bytes + 1)
 
 fn main() raises:
     with open("to_lower.csv", "r") as f:
@@ -478,6 +478,6 @@ fn main() raises:
         for i in range(1, table.row_count()):
             var source = table.get(i, 2)
             var dest = table.get(i, 7)
-            var conv = lower_utf8(source._as_ptr(), len(source))
+            var conv = lower_utf8(source.unsafe_uint8_ptr(), len(source))
             if conv != dest:
                 print("!!!!", i, table.get(i, 1), source, conv, dest)
