@@ -2,8 +2,9 @@ from .string_utils import find_indices, string_from_pointer
 from algorithm.functional import vectorize
 from sys.info import simdwidthof
 from sys.intrinsics import compressed_store
-from math import iota, reduce_bit_count
-from memory import stack_allocation
+from math import iota
+from memory import stack_allocation, memcpy, UnsafePointer
+from bit import pop_count
 
 
 alias QUOTE = ord('"')
@@ -11,6 +12,7 @@ alias COMMA = ord(",")
 alias LF = ord("\n")
 alias CR = ord("\r")
 alias simd_width_u8 = simdwidthof[DType.uint8]()
+
 
 struct CsvTable[sep: Int = COMMA]:
     var _inner_string: String
@@ -70,7 +72,7 @@ struct CsvTable[sep: Int = COMMA]:
 
     @always_inline
     fn _simd_parse(inout self):
-        var p = DTypePointer(self._inner_string.unsafe_uint8_ptr())
+        var p = UnsafePointer(self._inner_string.unsafe_ptr())
         var string_byte_length = len(self._inner_string)
         var in_quotes = False
         var last_chunk__ends_on_cr = False
@@ -87,11 +89,9 @@ struct CsvTable[sep: Int = COMMA]:
             var crs = chars == CR
 
             var offsets = iota[DType.uint8, simd_width]()
-            var sp: DTypePointer[DType.uint8] = stack_allocation[
-                simd_width, UInt8, simd_width
-            ]()
+            var sp: UnsafePointer[UInt8] = stack_allocation[simd_width, UInt8]()
             compressed_store(offsets, sp, all_bits)
-            var all_len = reduce_bit_count(all_bits)
+            var all_len = all_bits.reduce_bit_count()
 
             for i in range(all_len):
                 var index = int(sp.load(i))
@@ -132,17 +132,17 @@ struct CsvTable[sep: Int = COMMA]:
         ):
             var start = self._starts[index] + 1
             var length = (self._ends[index] - 1) - start
-            var p1 = Pointer[UInt8].alloc(length + 1)
-            memcpy(p1, self._inner_string.unsafe_uint8_ptr().offset(start), length)
+            var p1 = UnsafePointer[UInt8].alloc(length + 1)
+            memcpy(p1, self._inner_string.unsafe_ptr().offset(start), length)
             var _inner_string = string_from_pointer(p1, length + 1)
             var quote_indices = find_indices(_inner_string, '"')
             var quotes_count = len(quote_indices)
             if quotes_count == 0 or quotes_count & 1 == 1:
                 return _inner_string
 
-            var p = _inner_string.unsafe_uint8_ptr()
+            var p = _inner_string.unsafe_ptr()
             var length2 = length - (quotes_count >> 1)
-            var p2 = Pointer[UInt8].alloc(length2 + 1)
+            var p2 = UnsafePointer[UInt8].alloc(length2 + 1)
             var offset2 = 0
             memcpy(p2, p, int(quote_indices[0]))
             offset2 += int(quote_indices[0])

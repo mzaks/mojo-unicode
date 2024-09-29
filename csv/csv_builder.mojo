@@ -1,4 +1,5 @@
 from memory.memory import memcpy
+from memory import UnsafePointer
 from buffer import Buffer, Dim
 from .string_utils import find_indices, contains_any_of, string_from_pointer
 
@@ -14,7 +15,7 @@ alias QUOTE = UInt8(ord(QUOTE_CHAR))
 
 
 struct CsvBuilder:
-    var _buffer: DTypePointer[DType.uint8]
+    var _buffer: UnsafePointer[UInt8]
     var _capacity: Int
     var num_bytes: Int
     var _column_count: Int
@@ -23,7 +24,7 @@ struct CsvBuilder:
 
     fn __init__(inout self, column_count: Int):
         self._capacity = 1024
-        self._buffer = DTypePointer[DType.uint8].alloc(self._capacity)
+        self._buffer = UnsafePointer[UInt8].alloc(self._capacity)
         self._column_count = column_count
         self._elements_count = 0
         self._finished = False
@@ -31,7 +32,7 @@ struct CsvBuilder:
 
     fn __init__(inout self, *coulmn_names: StringLiteral):
         self._capacity = 1024
-        self._buffer = DTypePointer[DType.uint8].alloc(self._capacity)
+        self._buffer = UnsafePointer[UInt8].alloc(self._capacity)
         self._elements_count = 0
         self._finished = False
         self.num_bytes = 0
@@ -46,18 +47,25 @@ struct CsvBuilder:
             self._buffer.free()
 
     fn push[D: DType](inout self, value: SIMD[D, 1]):
-        var s = String(value)
-        var size = len(s)
+        var s = str(value)
         self.push(s, False)
 
-    fn push_stringabel[T: Stringable](inout self, value: T, consider_escaping: Bool = False):
+    fn push(inout self, value: Int):
+        var s = str(value)
+        self.push(s, False)
+
+    fn push_stringabel[
+        T: Stringable
+    ](inout self, value: T, consider_escaping: Bool = False):
         self.push(str(value), consider_escaping)
 
     fn push_empty(inout self):
         self.push("", False)
 
     fn fill_up_row(inout self):
-        var num_empty = self._column_count - (self._elements_count % self._column_count)
+        var num_empty = self._column_count - (
+            self._elements_count % self._column_count
+        )
         if num_empty < self._column_count:
             for _ in range(num_empty):
                 self.push_empty()
@@ -66,7 +74,9 @@ struct CsvBuilder:
         if consider_escaping and contains_any_of(
             s, CR_CHAR, LF_CHAR, COMMA_CHAR, QUOTE_CHAR
         ):
-            return self.push(QUOTE_CHAR + escape_quotes_in(s) + QUOTE_CHAR, False)
+            return self.push(
+                QUOTE_CHAR + escape_quotes_in(s) + QUOTE_CHAR, False
+            )
 
         var size = len(s)
         self._extend_buffer_if_needed(size + 2)
@@ -79,7 +89,7 @@ struct CsvBuilder:
                 self._buffer.offset(self.num_bytes).store(COMMA)
                 self.num_bytes += 1
 
-        memcpy(self._buffer.offset(self.num_bytes), s.unsafe_uint8_ptr(), size)
+        memcpy(self._buffer.offset(self.num_bytes), s.unsafe_ptr(), size)
         s._strref_keepalive()
 
         self.num_bytes += size
@@ -92,7 +102,7 @@ struct CsvBuilder:
         var new_size = self._capacity
         while new_size < self.num_bytes + size:
             new_size *= 2
-        var p = DTypePointer[DType.uint8].alloc(new_size)
+        var p = UnsafePointer[UInt8].alloc(new_size)
         memcpy(p, self._buffer, self.num_bytes)
         self._buffer.free()
         self._capacity = new_size
@@ -114,8 +124,8 @@ fn escape_quotes_in(s: String) -> String:
         return s
 
     var size = len(s._buffer)
-    var p_current = s.unsafe_uint8_ptr()
-    var p_result = DTypePointer[DType.uint8].alloc(size + i_size)
+    var p_current = s.unsafe_ptr()
+    var p_result = UnsafePointer[UInt8].alloc(size + i_size)
     var first_index = int(indices[0])
     memcpy(p_result, p_current, first_index)
     p_result.offset(first_index).store(QUOTE)
@@ -129,5 +139,7 @@ fn escape_quotes_in(s: String) -> String:
         offset += 1
 
     var last_index = int(indices[i_size - 1])
-    memcpy(p_result.offset(offset), p_current.offset(last_index), size - last_index)
+    memcpy(
+        p_result.offset(offset), p_current.offset(last_index), size - last_index
+    )
     return string_from_pointer(p_result, size + i_size)
