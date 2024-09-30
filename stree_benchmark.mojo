@@ -3,7 +3,10 @@ from stree import prepare, index
 from time import now
 from utils import unroll
 from bit import bit_width
+from benchmark import run, Report
+from testing import assert_equal
 
+@always_inline
 fn bsearch_index[dt: DType, lookup: List[Scalar[dt]]](x: Scalar[dt]) -> Int:
     var cursor = 0
     var b = lookup.data
@@ -15,6 +18,7 @@ fn bsearch_index[dt: DType, lookup: List[Scalar[dt]]](x: Scalar[dt]) -> Int:
 
     return cursor if b.load(cursor) == x else -1
 
+@always_inline
 fn bsearch_index_unrolled[dt: DType, lookup: List[Scalar[dt]]](x: Scalar[dt]) -> Int:
     fn log2(_i: Int) -> Int:
         var i = _i >> 1
@@ -38,6 +42,7 @@ fn bsearch_index_unrolled[dt: DType, lookup: List[Scalar[dt]]](x: Scalar[dt]) ->
 
     return cursor if b.load(cursor) == x else -1
 
+@always_inline
 fn bsearch_index_default[dt: DType, lookup: List[Scalar[dt]]](x: Scalar[dt]) -> Int:
     var low = 0
     var high = len(lookup) - 1
@@ -53,77 +58,99 @@ fn bsearch_index_default[dt: DType, lookup: List[Scalar[dt]]](x: Scalar[dt]) -> 
             return mid
     return -1
 
-fn measure_stree[dt: DType, list: List[Scalar[dt]]]():
-    var btree = prepare[dt, list.data, 16, len(list)]()
-    var indices = List[Int](capacity=len(list))
-    var start = now()
-    var rounds = 200
-    for _ in range(rounds):
+
+fn validate(l: List[Int]) raises:
+    for i in range(len(l)):
+        assert_equal(i, l[i])
+
+
+fn main() raises:
+
+    var indices = List[Int]()
+
+    @parameter
+    fn find[dt: DType, list: List[Scalar[dt]], f: fn[dt:DType, list:List[Scalar[dt]]](Scalar[dt]) -> Int]():
         indices.clear()
         for i in list:
-            indices.append(index[dt](btree.data, btree.offsets, i[]))
-    var duration = now() - start
-    for i in range(len(indices)):
-        if indices[i] != i:
-            print("!!!")
-    print(duration / rounds / len(indices))
+            indices.append(f[dt, list](i[]))
 
-fn measure_bsearch[dt: DType, list: List[Scalar[dt]]]():
-    var indices = List[Int](capacity=len(list))
-    var start = now()
-    var rounds = 200
-    for _ in range(rounds):
+    var report: Report
+
+    print("Binary Search")
+    report = run[find[DType.uint16, has_lower_case_2, bsearch_index_default]]()
+    print(str("has_lower_case_2").ljust(20), report.mean("ns"))
+    validate(indices)
+
+    report = run[find[DType.uint32, has_lower_case_3, bsearch_index_default]]()
+    print(str("has_lower_case_3").ljust(20), report.mean("ns"))
+    validate(indices)
+
+    report = run[find[DType.uint32, has_lower_case_4, bsearch_index_default]]()
+    print(str("has_lower_case_4").ljust(20), report.mean("ns"))
+    validate(indices)
+
+    print("Branch free Binary Search")
+    report = run[find[DType.uint16, has_lower_case_2, bsearch_index]]()
+    print(str("has_lower_case_2").ljust(20), report.mean("ns"))
+    validate(indices)
+
+    report = run[find[DType.uint32, has_lower_case_3, bsearch_index]]()
+    print(str("has_lower_case_3").ljust(20), report.mean("ns"))
+    validate(indices)
+
+    report = run[find[DType.uint32, has_lower_case_4, bsearch_index]]()
+    print(str("has_lower_case_4").ljust(20), report.mean("ns"))
+    validate(indices)
+
+    print("Branch free Unrolled Binary Search")
+    report = run[find[DType.uint16, has_lower_case_2, bsearch_index_unrolled]]()
+    print(str("has_lower_case_2").ljust(20), report.mean("ns"))
+    validate(indices)
+
+    report = run[find[DType.uint32, has_lower_case_3, bsearch_index_unrolled]]()
+    print(str("has_lower_case_3").ljust(20), report.mean("ns"))
+    validate(indices)
+
+    report = run[find[DType.uint32, has_lower_case_4, bsearch_index_unrolled]]()
+    print(str("has_lower_case_4").ljust(20), report.mean("ns"))
+    validate(indices)
+
+    var btree2 = prepare[DType.uint16, has_lower_case_2.data, 16, len(has_lower_case_2)]()
+    var btree3 = prepare[DType.uint32, has_lower_case_3.data, 16, len(has_lower_case_3)]()
+    var btree4 = prepare[DType.uint32, has_lower_case_4.data, 16, len(has_lower_case_4)]()
+
+    @parameter
+    fn find_stree2():
         indices.clear()
-        for i in list:
-            indices.append(bsearch_index[dt, list](i[]))
-    var duration = now() - start
-    for i in range(len(indices)):
-        if indices[i] != i:
-            print("!!!")
-    print(duration / rounds / len(indices))
+        for i in has_lower_case_2:
+            indices.append(index[DType.uint16](btree2.data, btree2.offsets, i[]))
 
-fn measure_bsearch_urolled[dt: DType, list: List[Scalar[dt]]]():
-    var indices = List[Int](capacity=len(list))
-    var start = now()
-    var rounds = 200
-    for _ in range(rounds):
+    @parameter
+    fn find_stree3():
         indices.clear()
-        for i in list:
-            indices.append(bsearch_index_unrolled[dt, list](i[]))
-    var duration = now() - start
-    for i in range(len(indices)):
-        if indices[i] != i:
-            print("!!!")
-    print(duration / rounds / len(indices))
+        for i in has_lower_case_3:
+            indices.append(index[DType.uint32](btree3.data, btree3.offsets, i[]))
 
-fn measure_bsearch_default[dt: DType, list: List[Scalar[dt]]]():
-    var indices = List[Int](capacity=len(list))
-    var start = now()
-    var rounds = 200
-    for _ in range(rounds):
+    @parameter
+    fn find_stree4():
         indices.clear()
-        for i in list:
-            indices.append(bsearch_index_default[dt, list](i[]))
-    var duration = now() - start
-    for i in range(len(indices)):
-        if indices[i] != i:
-            print("!!!")
-    print(duration / rounds / len(indices))
+        for i in has_lower_case_4:
+            indices.append(index[DType.uint32](btree4.data, btree4.offsets, i[]))
 
-fn main():
-    print("--- STree Search ---")
-    measure_stree[DType.uint16, has_lower_case_2]()
-    measure_stree[DType.uint32, has_lower_case_3]()
-    measure_stree[DType.uint32, has_lower_case_4]()
-    print("--- Binary Search Branchless ---")
-    measure_bsearch[DType.uint16, has_lower_case_2]()
-    measure_bsearch[DType.uint32, has_lower_case_3]()
-    measure_bsearch[DType.uint32, has_lower_case_4]()
-    print("--- Binary Search Branchless Unrolled ---")
-    measure_bsearch_urolled[DType.uint16, has_lower_case_2]()
-    measure_bsearch_urolled[DType.uint32, has_lower_case_3]()
-    measure_bsearch_urolled[DType.uint32, has_lower_case_4]()
-    print("--- Binary Search Default ---")
-    measure_bsearch_default[DType.uint16, has_lower_case_2]()
-    measure_bsearch_default[DType.uint32, has_lower_case_3]()
-    measure_bsearch_default[DType.uint32, has_lower_case_4]()
+    print("STree")
+    report = run[find_stree2]()
+    print(str("has_lower_case_2").ljust(20), report.mean("ns"))
+    validate(indices)
+
+    report = run[find_stree3]()
+    print(str("has_lower_case_3").ljust(20), report.mean("ns"))
+    validate(indices)
+
+    report = run[find_stree4]()
+    print(str("has_lower_case_4").ljust(20), report.mean("ns"))
+    validate(indices)
+
+    _ = btree2^
+    _ = btree3^
+    _ = btree4^
+    _ = indices^

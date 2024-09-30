@@ -2,18 +2,31 @@ from utf8_case_lookups import *
 from bit import count_leading_zeros, byte_swap
 from memory import bitcast, UnsafePointer
 from sys import is_big_endian
+from utils import unroll
 
 @always_inline
 fn _to_index_16[lookup: List[UInt16]](x: UInt16) -> Int:
     """Find index of rune in lookup with binary search.
     Returns -1 if not found."""
+    fn log2(_i: Int) -> Int:
+        var i = _i >> 1
+        var result = 1
+        while i:
+            i >>= 1
+            result += 1
+        return result
+    alias depth = log2(len(lookup))
+    
     var cursor = 0
     var b = lookup.data
     var length = len(lookup)
-    while length > 1:
+    @parameter
+    fn search[i: Int]():
         var half = length >> 1
         length -= half
         cursor += int(b.load(cursor + half - 1) < x) * half
+    
+    unroll[search, depth]()
 
     return cursor if b.load(cursor) == x else -1
 
@@ -21,13 +34,25 @@ fn _to_index_16[lookup: List[UInt16]](x: UInt16) -> Int:
 fn _to_index_32[lookup: List[UInt32]](x: UInt32) -> Int:
     """Find index of rune in lookup with binary search.
     Returns -1 if not found."""
+    fn log2(_i: Int) -> Int:
+        var i = _i >> 1
+        var result = 1
+        while i:
+            i >>= 1
+            result += 1
+        return result
+    alias depth = log2(len(lookup))
+    
     var cursor = 0
     var b = lookup.data
     var length = len(lookup)
-    while length > 1:
+    @parameter
+    fn search[i: Int]():
         var half = length >> 1
         length -= half
         cursor += int(b.load(cursor + half - 1) < x) * half
+    
+    unroll[search, depth]()
 
     return cursor if b.load(cursor) == x else -1
 
@@ -55,7 +80,7 @@ fn to_lowercase(s: String) -> String:
             output[output_offset] = _to_lower(b)
             output_offset += 1
         elif bytes == 2:
-            var u16 = input.bitcast[DType.uint16]()[]
+            var u16 = input.offset(input_offset).bitcast[DType.uint16]()[]
             @parameter
             if is_big_endian():
                 u16 = byte_swap(u16)
@@ -68,7 +93,7 @@ fn to_lowercase(s: String) -> String:
                 output.offset(output_offset).store[width=4](v)
                 output_offset += int(v[3])
         elif bytes == 3:
-            var v = input.load[width=4]()
+            var v = input.offset(input_offset).load[width=4]()
             v[3] = 0
             var u32 = bitcast[DType.uint32, 1](v)
             @parameter
@@ -84,7 +109,7 @@ fn to_lowercase(s: String) -> String:
                 output.offset(output_offset).store[width=4](v)
                 output_offset += int(v[3])
         elif bytes == 4:
-            var u32 = input.bitcast[DType.uint32]()[]
+            var u32 = input.offset(input_offset).bitcast[DType.uint32]()[]
             @parameter
             if is_big_endian():
                 u32 = byte_swap(u32)
@@ -123,7 +148,7 @@ fn to_lowercase2(s: String) -> String:
             output[output_offset] = _to_lower(b)
             output_offset += 1
         elif bytes == 2:
-            var u16 = input.bitcast[DType.uint16]()[]
+            var u16 = input.offset(input_offset).bitcast[DType.uint16]()[]
             @parameter
             if is_big_endian():
                 u16 = byte_swap(u16)
@@ -136,7 +161,7 @@ fn to_lowercase2(s: String) -> String:
                 output.offset(output_offset).store[width=4](v)
                 output_offset += int(v[3])
         elif bytes == 3:
-            var v = input.load[width=4]()
+            var v = input.offset(input_offset).load[width=4]()
             v[3] = 0
             var u32 = bitcast[DType.uint32, 1](v)
             @parameter
@@ -152,7 +177,7 @@ fn to_lowercase2(s: String) -> String:
                 output.offset(output_offset).store[width=4](v)
                 output_offset += int(v[3])
         elif bytes == 4:
-            var u32 = input.bitcast[DType.uint32]()[]
+            var u32 = input.offset(input_offset).bitcast[DType.uint32]()[]
             @parameter
             if is_big_endian():
                 u32 = byte_swap(u32)
