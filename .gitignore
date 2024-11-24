@@ -4,3 +4,5 @@
 # magic environments
 .magic
 install_id
+# rust
+rust/traget/
