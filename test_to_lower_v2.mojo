@@ -3,38 +3,12 @@
 from to_lower_v2 import lower_utf8, _to_lower, Diff
 
 
-def parse_int(s: String) raises -> Int:
-    return Int(s)
-
-
-def split_csv_line(line: String) -> List[String]:
-    """Split a CSV line by commas."""
-    var result = List[String]()
-    var current = String("")
-    for ch in line.codepoint_slices():
-        if ch == ",":
-            result.append(current^)
-            current = String("")
-        else:
-            current += String(ch)
-    if len(current) > 0:
-        result.append(current^)
-    return result^
-
-
 def parse_bytes(s: String) raises -> List[Int]:
     """Parse a space-separated byte string like '195 128' into a list of ints."""
     var result = List[Int]()
-    var current = String("")
-    for ch in s.codepoint_slices():
-        if ch == " ":
-            if len(current) > 0:
-                result.append(Int(current))
-                current = String("")
-        else:
-            current += String(ch)
-    if len(current) > 0:
-        result.append(Int(current))
+    for part in s.split(" "):
+        if len(part) > 0:
+            result.append(Int(String(part)))
     return result^
 
 
@@ -57,15 +31,15 @@ def test_individual_mappings() raises -> Int:
         if len(line) < 5:
             continue
 
-        var fields = split_csv_line(String(line))
+        var fields = String(line).split(",")
         if len(fields) < 12:
             continue
 
-        var src_hex = fields[0]
-        var src_len = Int(fields[3])
-        var src_bytes_str = fields[4]
-        var dst_len = Int(fields[8])
-        var dst_bytes_str = fields[9]
+        var src_hex = String(fields[0])
+        var src_len = Int(String(fields[3]))
+        var src_bytes_str = String(fields[4])
+        var dst_len = Int(String(fields[8]))
+        var dst_bytes_str = String(fields[9])
 
         var src_bytes = parse_bytes(src_bytes_str)
         var dst_bytes = parse_bytes(dst_bytes_str)

@@ -1,5 +1,3 @@
-from std.bit import count_leading_zeros
-
 
 comptime Diff = SIMD[DType.int32, 4]
 
@@ -17,7 +15,7 @@ fn _to_lower(a: UInt8, b: UInt8) -> Diff:
     Returns Diff(delta_byte0, delta_byte1, extra_byte, output_len).
     """
     if a == 195:
-        if (b >= 128 and b <= 158 and b & 1 == 0) or (b >= 129 and b <= 149 and b & 1 == 1) or (b >= 153 and b <= 157 and b & 1 == 1):
+        if (b >= 128 and b <= 150) or (b >= 152 and b <= 158):
             return Diff(0, 32, 0, 2)
     elif a == 196:
         if (b >= 128 and b <= 174 and b & 1 == 0) or (b >= 178 and b <= 182 and b & 1 == 0) or (b >= 185 and b <= 189 and b & 1 == 1):
@@ -107,7 +105,7 @@ fn _to_lower(a: UInt8, b: UInt8) -> Diff:
             return Diff(1, -1, 0, 2)
         elif b >= 145 and b <= 159:
             return Diff(0, 32, 0, 2)
-        elif (b == 160) or (b >= 161 and b <= 171 and b & 1 == 1) or (b >= 164 and b <= 170 and b & 1 == 0):
+        elif (b == 160) or (b == 161) or (b >= 163 and b <= 171):
             return Diff(1, -32, 0, 2)
     elif a == 207:
         if b == 143:
@@ -159,7 +157,7 @@ fn _to_lower(a: UInt8, b: UInt8, c: UInt8) -> Diff:
     if a == 225:
         if b == 130 and c >= 160 and c <= 191:
             return Diff(1, 50, -32, 3)
-        elif b == 131 and ((c >= 128 and c <= 132 and c & 1 == 0) or (c >= 129 and c <= 135 and c & 1 == 1) or (c == 141)):
+        elif b == 131 and ((c >= 128 and c <= 133) or (c == 135) or (c == 141)):
             return Diff(1, 49, 32, 3)
         elif b == 142:
             if c >= 160 and c <= 175:
@@ -171,7 +169,7 @@ fn _to_lower(a: UInt8, b: UInt8, c: UInt8) -> Diff:
                 return Diff(9, 31, 16, 3)
             elif c >= 176 and c <= 181:
                 return Diff(0, 0, 8, 3)
-        elif b == 178 and ((c >= 144 and c <= 186 and c & 1 == 0) or (c >= 145 and c <= 185 and c & 1 == 1) or (c == 189) or (c == 190) or (c == 191)):
+        elif b == 178 and ((c >= 144 and c <= 186) or (c >= 189 and c <= 191)):
             return Diff(0, -47, 0, 3)
         elif b == 184 and c >= 128 and c <= 190 and c & 1 == 0:
             return Diff(0, 0, 1, 3)
@@ -186,22 +184,16 @@ fn _to_lower(a: UInt8, b: UInt8, c: UInt8) -> Diff:
                 return Diff(0, 0, 1, 3)
         elif b == 187 and c >= 128 and c <= 190 and c & 1 == 0:
             return Diff(0, 0, 1, 3)
-        elif b == 188 and ((c >= 136 and c <= 142 and c & 1 == 0) or (c >= 137 and c <= 143 and c & 1 == 1) or (c >= 152 and c <= 156 and c & 1 == 0) or (c >= 153 and c <= 157 and c & 1 == 1) or (c >= 168 and c <= 174 and c & 1 == 0) or (c >= 169 and c <= 175 and c & 1 == 1) or (c >= 184 and c <= 190 and c & 1 == 0) or (c >= 185 and c <= 191 and c & 1 == 1)):
+        elif b == 188 and ((c >= 136 and c <= 143) or (c >= 152 and c <= 157) or (c >= 168 and c <= 175) or (c >= 184 and c <= 191)):
             return Diff(0, 0, -8, 3)
-        elif b == 189 and ((c >= 136 and c <= 140 and c & 1 == 0) or (c >= 137 and c <= 141 and c & 1 == 1) or (c >= 153 and c <= 159 and c & 1 == 1) or (c >= 168 and c <= 174 and c & 1 == 0) or (c >= 169 and c <= 175 and c & 1 == 1)):
+        elif b == 189 and ((c >= 136 and c <= 141) or (c >= 153 and c <= 159 and c & 1 == 1) or (c >= 168 and c <= 175)):
             return Diff(0, 0, -8, 3)
         elif b == 190:
-            if c >= 136 and c <= 142 and c & 1 == 0:
+            if c >= 136 and c <= 143:
                 return Diff(0, 0, -8, 3)
-            elif c >= 137 and c <= 143 and c & 1 == 1:
+            elif c >= 152 and c <= 159:
                 return Diff(0, 0, -8, 3)
-            elif c >= 152 and c <= 158 and c & 1 == 0:
-                return Diff(0, 0, -8, 3)
-            elif c >= 153 and c <= 159 and c & 1 == 1:
-                return Diff(0, 0, -8, 3)
-            elif c >= 168 and c <= 174 and c & 1 == 0:
-                return Diff(0, 0, -8, 3)
-            elif c >= 169 and c <= 175 and c & 1 == 1:
+            elif c >= 168 and c <= 175:
                 return Diff(0, 0, -8, 3)
             elif c == 184:
                 return Diff(0, 0, -8, 3)
@@ -396,9 +388,9 @@ fn _to_lower(a: UInt8, b: UInt8, c: UInt8, d: UInt8) -> Diff:
                 return Diff(0, 0, 1, -24)
             elif c == 147 and d >= 128 and d <= 147:
                 return Diff(0, 0, 0, 40)
-            elif c == 149 and ((d >= 176 and d <= 190 and d & 1 == 0) or (d >= 177 and d <= 185 and d & 1 == 1) or (d == 189) or (d == 191)):
+            elif c == 149 and ((d >= 176 and d <= 186) or (d >= 188 and d <= 191)):
                 return Diff(0, 0, 1, -25)
-            elif c == 150 and ((d >= 128 and d <= 148 and d & 1 == 0) or (d >= 129 and d <= 137 and d & 1 == 1) or (d >= 141 and d <= 145 and d & 1 == 1) or (d == 149)):
+            elif c == 150 and ((d >= 128 and d <= 138) or (d >= 140 and d <= 146) or (d == 148) or (d == 149)):
                 return Diff(0, 0, 0, 39)
             elif c == 178 and d >= 128 and d <= 178:
                 return Diff(0, 0, 1, 0)
@@ -443,27 +435,33 @@ fn lower_utf8(s: String) -> String:
         if char_length == 1:
             buf.append(Byte(b0 + _to_lower(b0)))
         elif char_length == 2:
-            var diff = _to_lower(b0, p[offset + 1])
+            var b1 = p[offset + 1]
+            var diff = _to_lower(b0, b1)
             var out_len = Int(diff[3])
             buf.append(Byte(Int(b0) + Int(diff[0])))
             if out_len >= 2:
-                buf.append(Byte(Int(p[offset + 1]) + Int(diff[1])))
+                buf.append(Byte(Int(b1) + Int(diff[1])))
             if out_len >= 3:
                 buf.append(Byte(Int(diff[2])))
         elif char_length == 3:
-            var diff = _to_lower(b0, p[offset + 1], p[offset + 2])
+            var b1 = p[offset + 1]
+            var b2 = p[offset + 2]
+            var diff = _to_lower(b0, b1, b2)
             var out_len = Int(diff[3])
             buf.append(Byte(Int(b0) + Int(diff[0])))
             if out_len >= 2:
-                buf.append(Byte(Int(p[offset + 1]) + Int(diff[1])))
+                buf.append(Byte(Int(b1) + Int(diff[1])))
             if out_len >= 3:
-                buf.append(Byte(Int(p[offset + 2]) + Int(diff[2])))
+                buf.append(Byte(Int(b2) + Int(diff[2])))
         elif char_length == 4:
-            var diff = _to_lower(b0, p[offset + 1], p[offset + 2], p[offset + 3])
+            var b1 = p[offset + 1]
+            var b2 = p[offset + 2]
+            var b3 = p[offset + 3]
+            var diff = _to_lower(b0, b1, b2, b3)
             buf.append(Byte(Int(b0) + Int(diff[0])))
-            buf.append(Byte(Int(p[offset + 1]) + Int(diff[1])))
-            buf.append(Byte(Int(p[offset + 2]) + Int(diff[2])))
-            buf.append(Byte(Int(p[offset + 3]) + Int(diff[3])))
+            buf.append(Byte(Int(b1) + Int(diff[1])))
+            buf.append(Byte(Int(b2) + Int(diff[2])))
+            buf.append(Byte(Int(b3) + Int(diff[3])))
         offset += char_length
 
     return String(unsafe_from_utf8=buf)

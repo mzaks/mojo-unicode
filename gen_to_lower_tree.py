@@ -10,10 +10,8 @@ Usage:
 """
 
 import csv
-import sys
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass
@@ -148,15 +146,18 @@ def find_patterns(byte_values: list[int], ret_map: dict[int, tuple]) -> list:
     for ret, vals in sorted(by_ret.items(), key=lambda x: x[1][0]):
         vals = sorted(vals)
 
-        # Check if it's a contiguous range (step=1)
-        if len(vals) >= 3 and vals == list(range(vals[0], vals[-1] + 1)):
-            patterns.append(RangeGroup(vals[0], vals[-1], ret))
-            continue
-
-        even_vals = sorted(v for v in vals if v % 2 == 0)
-        odd_vals = sorted(v for v in vals if v % 2 == 1)
-
         handled = set()
+
+        # First, find contiguous sub-ranges (step=1)
+        for lo, hi in find_contiguous_sub_ranges(vals, step=1):
+            count = hi - lo + 1
+            if count >= 3:
+                patterns.append(RangeGroup(lo, hi, ret))
+                handled.update(range(lo, hi + 1))
+
+        remaining = sorted(v for v in vals if v not in handled)
+        even_vals = sorted(v for v in remaining if v % 2 == 0)
+        odd_vals = sorted(v for v in remaining if v % 2 == 1)
 
         # Find contiguous even sub-ranges (step=2)
         for lo, hi in find_contiguous_sub_ranges(even_vals, step=2):
@@ -182,7 +183,7 @@ def find_patterns(byte_values: list[int], ret_map: dict[int, tuple]) -> list:
     return patterns
 
 
-def fmt_ret(ret: tuple, src_len: int) -> str:
+def fmt_ret(ret: tuple) -> str:
     """Format a return tuple as Mojo code using Diff (SIMD[DType.int32, 4])."""
     return f"Diff({', '.join(str(x) for x in ret)})"
 
@@ -258,7 +259,7 @@ def generate_2byte(mappings: list[Mapping]) -> str:
                 conds = [gen_condition(p, "b") for p in ps]
                 combined = " or ".join(f"({c})" for c in conds)
                 lines.append(f"        {p_prefix} {combined}:")
-            lines.append(f"            return {fmt_ret(ret, 2)}")
+            lines.append(f"            return {fmt_ret(ret)}")
 
     lines.append("    return Diff(0, 0, 0, 2)")
     return "\n".join(lines)
@@ -308,12 +309,12 @@ def generate_3byte(mappings: list[Mapping]) -> str:
             if len(patterns) == 1 and patterns[0].lo == patterns[0].hi:
                 p = patterns[0]
                 lines.append(f"        {prefix_b} b == {fb} and c == {p.lo}:")
-                lines.append(f"            return {fmt_ret(p.ret, 3)}")
+                lines.append(f"            return {fmt_ret(p.ret)}")
             elif len(patterns) == 1:
                 p = patterns[0]
                 cond_c = gen_condition(p, "c")
                 lines.append(f"        {prefix_b} b == {fb} and {cond_c}:")
-                lines.append(f"            return {fmt_ret(p.ret, 3)}")
+                lines.append(f"            return {fmt_ret(p.ret)}")
             else:
                 # Check if all patterns have same return tuple
                 all_rets = set(p.ret for p in patterns)
@@ -322,7 +323,7 @@ def generate_3byte(mappings: list[Mapping]) -> str:
                     conds = [gen_condition(p, "c") for p in patterns]
                     combined = " or ".join(f"({c})" for c in conds) if len(conds) > 1 else conds[0]
                     lines.append(f"        {prefix_b} b == {fb} and ({combined}):")
-                    lines.append(f"            return {fmt_ret(ret, 3)}")
+                    lines.append(f"            return {fmt_ret(ret)}")
                 else:
                     lines.append(f"        {prefix_b} b == {fb}:")
                     first_c = True
@@ -331,7 +332,7 @@ def generate_3byte(mappings: list[Mapping]) -> str:
                         first_c = False
                         cond = gen_condition(p, "c")
                         lines.append(f"            {prefix_c} {cond}:")
-                        lines.append(f"                return {fmt_ret(p.ret, 3)}")
+                        lines.append(f"                return {fmt_ret(p.ret)}")
 
     lines.append("    return Diff(0, 0, 0, 3)")
     return "\n".join(lines)
@@ -389,7 +390,7 @@ def generate_4byte(mappings: list[Mapping]) -> str:
                     p = patterns[0]
                     cond_d = gen_condition(p, "d")
                     lines.append(f"        {prefix_b} b == {fb} and c == {fc} and {cond_d}:")
-                    lines.append(f"            return {fmt_ret(p.ret, 4)}")
+                    lines.append(f"            return {fmt_ret(p.ret)}")
                 else:
                     all_rets = set(p.ret for p in patterns)
                     if len(all_rets) == 1:
@@ -397,7 +398,7 @@ def generate_4byte(mappings: list[Mapping]) -> str:
                         conds = [gen_condition(p, "d") for p in patterns]
                         combined = " or ".join(f"({c})" for c in conds) if len(conds) > 1 else conds[0]
                         lines.append(f"        {prefix_b} b == {fb} and c == {fc} and ({combined}):")
-                        lines.append(f"            return {fmt_ret(ret, 4)}")
+                        lines.append(f"            return {fmt_ret(ret)}")
                     else:
                         lines.append(f"        {prefix_b} b == {fb} and c == {fc}:")
                         first_d = True
@@ -406,7 +407,7 @@ def generate_4byte(mappings: list[Mapping]) -> str:
                             first_d = False
                             cond = gen_condition(p, "d")
                             lines.append(f"            {prefix_d} {cond}:")
-                            lines.append(f"                return {fmt_ret(p.ret, 4)}")
+                            lines.append(f"                return {fmt_ret(p.ret)}")
             else:
                 lines.append(f"        {prefix_b} b == {fb}:")
                 first_c = True
@@ -426,7 +427,7 @@ def generate_4byte(mappings: list[Mapping]) -> str:
                         p = patterns[0]
                         cond_d = gen_condition(p, "d")
                         lines.append(f"            {prefix_c} c == {fc} and {cond_d}:")
-                        lines.append(f"                return {fmt_ret(p.ret, 4)}")
+                        lines.append(f"                return {fmt_ret(p.ret)}")
                     else:
                         all_rets = set(p.ret for p in patterns)
                         if len(all_rets) == 1:
@@ -434,7 +435,7 @@ def generate_4byte(mappings: list[Mapping]) -> str:
                             conds = [gen_condition(p, "d") for p in patterns]
                             combined = " or ".join(f"({c})" for c in conds) if len(conds) > 1 else conds[0]
                             lines.append(f"            {prefix_c} c == {fc} and ({combined}):")
-                            lines.append(f"                return {fmt_ret(ret, 4)}")
+                            lines.append(f"                return {fmt_ret(ret)}")
                         else:
                             lines.append(f"            {prefix_c} c == {fc}:")
                             first_d = True
@@ -443,7 +444,7 @@ def generate_4byte(mappings: list[Mapping]) -> str:
                                 first_d = False
                                 cond = gen_condition(p, "d")
                                 lines.append(f"                {prefix_d} {cond}:")
-                                lines.append(f"                    return {fmt_ret(p.ret, 4)}")
+                                lines.append(f"                    return {fmt_ret(p.ret)}")
 
     lines.append("    return Diff(0, 0, 0, 0)")
     return "\n".join(lines)
@@ -480,27 +481,33 @@ fn lower_utf8(s: String) -> String:
         if char_length == 1:
             buf.append(Byte(b0 + _to_lower(b0)))
         elif char_length == 2:
-            var diff = _to_lower(b0, p[offset + 1])
+            var b1 = p[offset + 1]
+            var diff = _to_lower(b0, b1)
             var out_len = Int(diff[3])
             buf.append(Byte(Int(b0) + Int(diff[0])))
             if out_len >= 2:
-                buf.append(Byte(Int(p[offset + 1]) + Int(diff[1])))
+                buf.append(Byte(Int(b1) + Int(diff[1])))
             if out_len >= 3:
                 buf.append(Byte(Int(diff[2])))
         elif char_length == 3:
-            var diff = _to_lower(b0, p[offset + 1], p[offset + 2])
+            var b1 = p[offset + 1]
+            var b2 = p[offset + 2]
+            var diff = _to_lower(b0, b1, b2)
             var out_len = Int(diff[3])
             buf.append(Byte(Int(b0) + Int(diff[0])))
             if out_len >= 2:
-                buf.append(Byte(Int(p[offset + 1]) + Int(diff[1])))
+                buf.append(Byte(Int(b1) + Int(diff[1])))
             if out_len >= 3:
-                buf.append(Byte(Int(p[offset + 2]) + Int(diff[2])))
+                buf.append(Byte(Int(b2) + Int(diff[2])))
         elif char_length == 4:
-            var diff = _to_lower(b0, p[offset + 1], p[offset + 2], p[offset + 3])
+            var b1 = p[offset + 1]
+            var b2 = p[offset + 2]
+            var b3 = p[offset + 3]
+            var diff = _to_lower(b0, b1, b2, b3)
             buf.append(Byte(Int(b0) + Int(diff[0])))
-            buf.append(Byte(Int(p[offset + 1]) + Int(diff[1])))
-            buf.append(Byte(Int(p[offset + 2]) + Int(diff[2])))
-            buf.append(Byte(Int(p[offset + 3]) + Int(diff[3])))
+            buf.append(Byte(Int(b1) + Int(diff[1])))
+            buf.append(Byte(Int(b2) + Int(diff[2])))
+            buf.append(Byte(Int(b3) + Int(diff[3])))
         offset += char_length
 
     return String(unsafe_from_utf8=buf)'''
@@ -511,8 +518,6 @@ def main():
     mappings = parse_csv(csv_file)
     by_len = group_by_src_len(mappings)
 
-    print("from std.bit import count_leading_zeros")
-    print()
     print()
     print("comptime Diff = SIMD[DType.int32, 4]")
     print()
