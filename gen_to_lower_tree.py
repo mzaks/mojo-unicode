@@ -1,0 +1,554 @@
+#!/usr/bin/env python3
+"""Generate a Mojo decision-tree to_lower implementation from to_lower.csv.
+
+This script reads the CSV file with Unicode uppercase-to-lowercase mappings
+and generates optimized Mojo code that performs lowercasing by computing
+byte-level adjustments on raw UTF-8 bytes, with no lookup tables.
+
+Usage:
+    python3 gen_to_lower_tree.py > to_lower_v2.mojo
+"""
+
+import csv
+from collections import defaultdict
+from dataclasses import dataclass
+
+
+@dataclass
+class Mapping:
+    src_hex: str
+    src_bytes: list[int]
+    dst_bytes: list[int]
+    diff_bytes: list[int]
+    src_len: int
+    dst_len: int
+
+
+def parse_csv(filename: str) -> list[Mapping]:
+    mappings = []
+    with open(filename) as f:
+        reader = csv.reader(f)
+        next(reader)  # skip header
+        for row in reader:
+            src_bytes = list(map(int, row[4].split()))
+            dst_bytes = list(map(int, row[9].split()))
+            diff_bytes = list(map(int, row[11].split()))
+            mappings.append(Mapping(
+                src_hex=row[0],
+                src_bytes=src_bytes,
+                dst_bytes=dst_bytes,
+                diff_bytes=diff_bytes,
+                src_len=int(row[3]),
+                dst_len=int(row[8]),
+            ))
+    return mappings
+
+
+def group_by_src_len(mappings: list[Mapping]) -> dict[int, list[Mapping]]:
+    groups = defaultdict(list)
+    for m in mappings:
+        groups[m.src_len].append(m)
+    return dict(groups)
+
+
+def compute_return_tuple(m: Mapping, src_len: int) -> tuple:
+    """Compute the (d0, d1, d2, d3) return tuple for a mapping.
+
+    For 2-byte chars: (delta_byte0, delta_byte1, extra_byte_or_0, output_len)
+    For 3-byte chars: (delta_byte0, delta_byte1, delta_byte2, output_len)
+    For 4-byte chars: (delta_byte0, delta_byte1, delta_byte2, delta_byte3)
+      where delta_byte3 for 4-byte is folded into the value directly
+    """
+    if src_len == 1:
+        return (32,)  # always +32 for ASCII
+
+    if src_len == 2:
+        d0 = m.dst_bytes[0] - m.src_bytes[0] if m.dst_len >= 1 else -m.src_bytes[0]
+        d1 = m.dst_bytes[1] - m.src_bytes[1] if m.dst_len >= 2 else -m.src_bytes[1]
+        if m.dst_len == 1:
+            # 2-byte -> 1-byte: output is just dst_bytes[0]
+            # result[0] = src[0] + d0 = dst[0], result[1] = src[1] + d1 = 0
+            return (d0, d1, 0, 1)
+        elif m.dst_len == 3:
+            # 2-byte -> 3-byte
+            return (d0, d1, m.dst_bytes[2], 3)
+        else:
+            return (d0, d1, 0, 2)
+
+    if src_len == 3:
+        if m.dst_len == 1:
+            d0 = m.dst_bytes[0] - m.src_bytes[0]
+            d1 = -m.src_bytes[1]
+            d2 = -m.src_bytes[2]
+            return (d0, d1, d2, 1)
+        elif m.dst_len == 2:
+            d0 = m.dst_bytes[0] - m.src_bytes[0]
+            d1 = m.dst_bytes[1] - m.src_bytes[1]
+            d2 = -m.src_bytes[2]
+            return (d0, d1, d2, 2)
+        else:
+            d0 = m.dst_bytes[0] - m.src_bytes[0]
+            d1 = m.dst_bytes[1] - m.src_bytes[1]
+            d2 = m.dst_bytes[2] - m.src_bytes[2]
+            return (d0, d1, d2, 3)
+
+    if src_len == 4:
+        d0 = m.dst_bytes[0] - m.src_bytes[0]
+        d1 = m.dst_bytes[1] - m.src_bytes[1]
+        d2 = m.dst_bytes[2] - m.src_bytes[2]
+        d3 = m.dst_bytes[3] - m.src_bytes[3]
+        return (d0, d1, d2, d3)
+
+    raise ValueError(f"Unsupported src_len: {src_len}")
+
+
+@dataclass
+class RangeGroup:
+    """A contiguous range of byte values with the same return tuple."""
+    lo: int
+    hi: int
+    ret: tuple
+    even_only: bool = False
+    odd_only: bool = False
+
+
+def find_contiguous_sub_ranges(vals: list[int], step: int = 1) -> list[tuple[int, int]]:
+    """Split sorted values into contiguous sub-ranges with given step."""
+    if not vals:
+        return []
+    ranges = []
+    start = vals[0]
+    prev = vals[0]
+    for v in vals[1:]:
+        if v == prev + step:
+            prev = v
+        else:
+            ranges.append((start, prev))
+            start = v
+            prev = v
+    ranges.append((start, prev))
+    return ranges
+
+
+def find_patterns(byte_values: list[int], ret_map: dict[int, tuple]) -> list:
+    """Find patterns in a set of (byte_value -> return_tuple) mappings.
+    Returns a list of RangeGroup for code generation.
+    """
+    if not byte_values:
+        return []
+
+    # Group consecutive values with the same return tuple
+    by_ret = defaultdict(list)
+    for bv in sorted(byte_values):
+        by_ret[ret_map[bv]].append(bv)
+
+    patterns = []
+    for ret, vals in sorted(by_ret.items(), key=lambda x: x[1][0]):
+        vals = sorted(vals)
+
+        handled = set()
+
+        # First, find contiguous sub-ranges (step=1)
+        for lo, hi in find_contiguous_sub_ranges(vals, step=1):
+            count = hi - lo + 1
+            if count >= 3:
+                patterns.append(RangeGroup(lo, hi, ret))
+                handled.update(range(lo, hi + 1))
+
+        remaining = sorted(v for v in vals if v not in handled)
+        even_vals = sorted(v for v in remaining if v % 2 == 0)
+        odd_vals = sorted(v for v in remaining if v % 2 == 1)
+
+        # Find contiguous even sub-ranges (step=2)
+        for lo, hi in find_contiguous_sub_ranges(even_vals, step=2):
+            count = (hi - lo) // 2 + 1
+            if count >= 3:
+                patterns.append(RangeGroup(lo, hi, ret, even_only=True))
+                handled.update(range(lo, hi + 1, 2))
+
+        # Find contiguous odd sub-ranges (step=2)
+        for lo, hi in find_contiguous_sub_ranges(odd_vals, step=2):
+            count = (hi - lo) // 2 + 1
+            if count >= 3:
+                patterns.append(RangeGroup(lo, hi, ret, odd_only=True))
+                handled.update(range(lo, hi + 1, 2))
+
+        # Remaining individual values
+        for v in vals:
+            if v not in handled:
+                patterns.append(RangeGroup(v, v, ret))
+
+    # Sort by lo value
+    patterns.sort(key=lambda p: p.lo)
+    return patterns
+
+
+def fmt_ret(ret: tuple) -> str:
+    """Format a return tuple as Mojo code using Diff (SIMD[DType.int32, 4])."""
+    return f"Diff({', '.join(str(x) for x in ret)})"
+
+
+def gen_condition(p: RangeGroup, var_name: str) -> str:
+    """Generate condition expression for a pattern."""
+    if p.lo == p.hi:
+        base = f"{var_name} == {p.lo}"
+    else:
+        base = f"{var_name} >= {p.lo} and {var_name} <= {p.hi}"
+
+    if p.even_only:
+        if p.lo == p.hi:
+            return base
+        return f"{base} and {var_name} & 1 == 0"
+    elif p.odd_only:
+        if p.lo == p.hi:
+            return base
+        return f"{base} and {var_name} & 1 == 1"
+    return base
+
+
+def generate_2byte(mappings: list[Mapping]) -> str:
+    """Generate the 2-byte _to_lower function."""
+    lines = []
+    lines.append("@always_inline")
+    lines.append("fn _to_lower(a: UInt8, b: UInt8) -> Diff:")
+    lines.append('    """Given two bytes of a UTF-8 char, returns byte adjustments for lowercasing.')
+    lines.append("    Returns Diff(delta_byte0, delta_byte1, extra_byte, output_len).")
+    lines.append('    """')
+
+    # Group by first byte
+    by_first = defaultdict(list)
+    for m in mappings:
+        by_first[m.src_bytes[0]].append(m)
+
+    first = True
+    for fb in sorted(by_first.keys()):
+        group = by_first[fb]
+        prefix = "if" if first else "elif"
+        first = False
+
+        lines.append(f"    {prefix} a == {fb}:")
+
+        # Build a map from second byte to return tuple
+        ret_map = {}
+        for m in group:
+            ret = compute_return_tuple(m, 2)
+            ret_map[m.src_bytes[1]] = ret
+
+        patterns = find_patterns(list(ret_map.keys()), ret_map)
+
+        # Group patterns by return value to merge conditions
+        by_ret_ordered = []
+        seen_rets = {}
+        for p in patterns:
+            if p.ret not in seen_rets:
+                seen_rets[p.ret] = len(by_ret_ordered)
+                by_ret_ordered.append((p.ret, [p]))
+            else:
+                by_ret_ordered[seen_rets[p.ret]][1].append(p)
+
+        emitted_first = True
+        for ret, ps in by_ret_ordered:
+            p_prefix = "if" if emitted_first else "elif"
+            emitted_first = False
+            if len(ps) == 1 and ps[0].lo == ps[0].hi:
+                lines.append(f"        {p_prefix} b == {ps[0].lo}:")
+            elif len(ps) == 1:
+                cond = gen_condition(ps[0], "b")
+                lines.append(f"        {p_prefix} {cond}:")
+            else:
+                conds = [gen_condition(p, "b") for p in ps]
+                combined = " or ".join(f"({c})" for c in conds)
+                lines.append(f"        {p_prefix} {combined}:")
+            lines.append(f"            return {fmt_ret(ret)}")
+
+    lines.append("    return Diff(0, 0, 0, 2)")
+    return "\n".join(lines)
+
+
+def generate_3byte(mappings: list[Mapping]) -> str:
+    """Generate the 3-byte _to_lower function."""
+    lines = []
+    lines.append("@always_inline")
+    lines.append("fn _to_lower(a: UInt8, b: UInt8, c: UInt8) -> Diff:")
+    lines.append('    """Given three bytes of a UTF-8 char, returns byte adjustments for lowercasing.')
+    lines.append("    Returns Diff(delta_byte0, delta_byte1, delta_byte2, output_len).")
+    lines.append('    """')
+
+    # Group by first byte
+    by_first = defaultdict(list)
+    for m in mappings:
+        by_first[m.src_bytes[0]].append(m)
+
+    first_a = True
+    for fa in sorted(by_first.keys()):
+        group_a = by_first[fa]
+        prefix_a = "if" if first_a else "elif"
+        first_a = False
+        lines.append(f"    {prefix_a} a == {fa}:")
+
+        # Group by second byte
+        by_second = defaultdict(list)
+        for m in group_a:
+            by_second[m.src_bytes[1]].append(m)
+
+        first_b = True
+        for fb in sorted(by_second.keys()):
+            group_b = by_second[fb]
+            prefix_b = "if" if first_b else "elif"
+            first_b = False
+
+            # Build ret_map for third byte
+            ret_map = {}
+            for m in group_b:
+                ret = compute_return_tuple(m, 3)
+                ret_map[m.src_bytes[2]] = ret
+
+            patterns = find_patterns(list(ret_map.keys()), ret_map)
+
+            # If only one pattern/value
+            if len(patterns) == 1 and patterns[0].lo == patterns[0].hi:
+                p = patterns[0]
+                lines.append(f"        {prefix_b} b == {fb} and c == {p.lo}:")
+                lines.append(f"            return {fmt_ret(p.ret)}")
+            elif len(patterns) == 1:
+                p = patterns[0]
+                cond_c = gen_condition(p, "c")
+                lines.append(f"        {prefix_b} b == {fb} and {cond_c}:")
+                lines.append(f"            return {fmt_ret(p.ret)}")
+            else:
+                # Check if all patterns have same return tuple
+                all_rets = set(p.ret for p in patterns)
+                if len(all_rets) == 1:
+                    ret = patterns[0].ret
+                    conds = [gen_condition(p, "c") for p in patterns]
+                    combined = " or ".join(f"({c})" for c in conds) if len(conds) > 1 else conds[0]
+                    lines.append(f"        {prefix_b} b == {fb} and ({combined}):")
+                    lines.append(f"            return {fmt_ret(ret)}")
+                else:
+                    lines.append(f"        {prefix_b} b == {fb}:")
+                    first_c = True
+                    for p in patterns:
+                        prefix_c = "if" if first_c else "elif"
+                        first_c = False
+                        cond = gen_condition(p, "c")
+                        lines.append(f"            {prefix_c} {cond}:")
+                        lines.append(f"                return {fmt_ret(p.ret)}")
+
+    lines.append("    return Diff(0, 0, 0, 3)")
+    return "\n".join(lines)
+
+
+def generate_4byte(mappings: list[Mapping]) -> str:
+    """Generate the 4-byte _to_lower function."""
+    lines = []
+    lines.append("@always_inline")
+    lines.append("fn _to_lower(a: UInt8, b: UInt8, c: UInt8, d: UInt8) -> Diff:")
+    lines.append('    """Given four bytes of a UTF-8 char, returns byte adjustments for lowercasing.')
+    lines.append("    Returns Diff(delta_byte0, delta_byte1, delta_byte2, delta_byte3).")
+    lines.append('    """')
+
+    # Group by first byte
+    by_first = defaultdict(list)
+    for m in mappings:
+        by_first[m.src_bytes[0]].append(m)
+
+    first_a = True
+    for fa in sorted(by_first.keys()):
+        group_a = by_first[fa]
+        prefix_a = "if" if first_a else "elif"
+        first_a = False
+        lines.append(f"    {prefix_a} a == {fa}:")
+
+        # Group by second byte
+        by_second = defaultdict(list)
+        for m in group_a:
+            by_second[m.src_bytes[1]].append(m)
+
+        first_b = True
+        for fb in sorted(by_second.keys()):
+            group_b = by_second[fb]
+            prefix_b = "if" if first_b else "elif"
+            first_b = False
+
+            # Group by third byte
+            by_third = defaultdict(list)
+            for m in group_b:
+                by_third[m.src_bytes[2]].append(m)
+
+            if len(by_third) == 1:
+                fc = list(by_third.keys())[0]
+                group_c = by_third[fc]
+
+                ret_map = {}
+                for m in group_c:
+                    ret = compute_return_tuple(m, 4)
+                    ret_map[m.src_bytes[3]] = ret
+
+                patterns = find_patterns(list(ret_map.keys()), ret_map)
+
+                if len(patterns) == 1:
+                    p = patterns[0]
+                    cond_d = gen_condition(p, "d")
+                    lines.append(f"        {prefix_b} b == {fb} and c == {fc} and {cond_d}:")
+                    lines.append(f"            return {fmt_ret(p.ret)}")
+                else:
+                    all_rets = set(p.ret for p in patterns)
+                    if len(all_rets) == 1:
+                        ret = patterns[0].ret
+                        conds = [gen_condition(p, "d") for p in patterns]
+                        combined = " or ".join(f"({c})" for c in conds) if len(conds) > 1 else conds[0]
+                        lines.append(f"        {prefix_b} b == {fb} and c == {fc} and ({combined}):")
+                        lines.append(f"            return {fmt_ret(ret)}")
+                    else:
+                        lines.append(f"        {prefix_b} b == {fb} and c == {fc}:")
+                        first_d = True
+                        for p in patterns:
+                            prefix_d = "if" if first_d else "elif"
+                            first_d = False
+                            cond = gen_condition(p, "d")
+                            lines.append(f"            {prefix_d} {cond}:")
+                            lines.append(f"                return {fmt_ret(p.ret)}")
+            else:
+                lines.append(f"        {prefix_b} b == {fb}:")
+                first_c = True
+                for fc in sorted(by_third.keys()):
+                    group_c = by_third[fc]
+                    prefix_c = "if" if first_c else "elif"
+                    first_c = False
+
+                    ret_map = {}
+                    for m in group_c:
+                        ret = compute_return_tuple(m, 4)
+                        ret_map[m.src_bytes[3]] = ret
+
+                    patterns = find_patterns(list(ret_map.keys()), ret_map)
+
+                    if len(patterns) == 1:
+                        p = patterns[0]
+                        cond_d = gen_condition(p, "d")
+                        lines.append(f"            {prefix_c} c == {fc} and {cond_d}:")
+                        lines.append(f"                return {fmt_ret(p.ret)}")
+                    else:
+                        all_rets = set(p.ret for p in patterns)
+                        if len(all_rets) == 1:
+                            ret = patterns[0].ret
+                            conds = [gen_condition(p, "d") for p in patterns]
+                            combined = " or ".join(f"({c})" for c in conds) if len(conds) > 1 else conds[0]
+                            lines.append(f"            {prefix_c} c == {fc} and ({combined}):")
+                            lines.append(f"                return {fmt_ret(ret)}")
+                        else:
+                            lines.append(f"            {prefix_c} c == {fc}:")
+                            first_d = True
+                            for p in patterns:
+                                prefix_d = "if" if first_d else "elif"
+                                first_d = False
+                                cond = gen_condition(p, "d")
+                                lines.append(f"                {prefix_d} {cond}:")
+                                lines.append(f"                    return {fmt_ret(p.ret)}")
+
+    lines.append("    return Diff(0, 0, 0, 0)")
+    return "\n".join(lines)
+
+
+def generate_main_function() -> str:
+    return '''
+fn lower_utf8(s: String) -> String:
+    """Convert a UTF-8 encoded string to lowercase using a decision tree.
+
+    Args:
+        s: Input string.
+
+    Returns:
+        A new string with all characters converted to lowercase.
+    """
+    var byte_len = s.byte_length()
+    var buf = List[Byte](capacity=byte_len // 2 * 3 + 1)
+    var offset = 0
+    var p = s.unsafe_ptr()
+    while offset < byte_len:
+        var b0 = p[offset]
+        # Detect UTF-8 character length from leading byte
+        var char_length: Int
+        if b0 >> 7 == 0:
+            char_length = 1
+        elif b0 >> 5 == 0b110:
+            char_length = 2
+        elif b0 >> 4 == 0b1110:
+            char_length = 3
+        else:
+            char_length = 4
+
+        if char_length == 1:
+            buf.append(Byte(b0 + _to_lower(b0)))
+        elif char_length == 2:
+            var b1 = p[offset + 1]
+            var diff = _to_lower(b0, b1)
+            var out_len = Int(diff[3])
+            buf.append(Byte(Int(b0) + Int(diff[0])))
+            if out_len >= 2:
+                buf.append(Byte(Int(b1) + Int(diff[1])))
+            if out_len >= 3:
+                buf.append(Byte(Int(diff[2])))
+        elif char_length == 3:
+            var b1 = p[offset + 1]
+            var b2 = p[offset + 2]
+            var diff = _to_lower(b0, b1, b2)
+            var out_len = Int(diff[3])
+            buf.append(Byte(Int(b0) + Int(diff[0])))
+            if out_len >= 2:
+                buf.append(Byte(Int(b1) + Int(diff[1])))
+            if out_len >= 3:
+                buf.append(Byte(Int(b2) + Int(diff[2])))
+        elif char_length == 4:
+            var b1 = p[offset + 1]
+            var b2 = p[offset + 2]
+            var b3 = p[offset + 3]
+            var diff = _to_lower(b0, b1, b2, b3)
+            buf.append(Byte(Int(b0) + Int(diff[0])))
+            buf.append(Byte(Int(b1) + Int(diff[1])))
+            buf.append(Byte(Int(b2) + Int(diff[2])))
+            buf.append(Byte(Int(b3) + Int(diff[3])))
+        offset += char_length
+
+    return String(unsafe_from_utf8=buf)'''
+
+
+def main():
+    csv_file = "to_lower.csv"
+    mappings = parse_csv(csv_file)
+    by_len = group_by_src_len(mappings)
+
+    print()
+    print("comptime Diff = SIMD[DType.int32, 4]")
+    print()
+    print()
+    # 1-byte: trivial
+    print("@always_inline")
+    print("fn _to_lower(a: UInt8) -> UInt8:")
+    print('    """Branch-free ASCII lowercase. Returns delta to add to the byte."""')
+    print("    var is_upper = (a >= 65) & (a <= 90)")
+    print("    return UInt8(Int(is_upper) * 32)")
+    print()
+    print()
+
+    # 2-byte
+    print(generate_2byte(by_len.get(2, [])))
+    print()
+    print()
+
+    # 3-byte
+    print(generate_3byte(by_len.get(3, [])))
+    print()
+    print()
+
+    # 4-byte
+    print(generate_4byte(by_len.get(4, [])))
+    print()
+
+    # Main function
+    print(generate_main_function())
+    print()
+
+
+if __name__ == "__main__":
+    main()
