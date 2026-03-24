@@ -1,4 +1,4 @@
-[project]
+[workspace]
 authors = ["Maxim Zaks <maxim.zaks@gmail.com>"]
 channels = ["conda-forge", "https://conda.modular.com/max-nightly"]
 description = "Add a short description here"
@@ -9,4 +9,4 @@ version = "0.1.0"
 [tasks]
 
 [dependencies]
-max = "*"
+mojo = "*"

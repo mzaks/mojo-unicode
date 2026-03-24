@@ -1,47 +1,47 @@
 from .string_utils import find_indices, string_from_pointer
 from algorithm.functional import vectorize
-from sys.info import simdwidthof
+# from sys.info import simdwidthof
 from sys.intrinsics import compressed_store
 from math import iota
 from memory import stack_allocation, memcpy, UnsafePointer
 from bit import pop_count
 
 
-alias QUOTE = ord('"')
-alias COMMA = ord(",")
-alias LF = ord("\n")
-alias CR = ord("\r")
-alias simd_width_u8 = simdwidthof[DType.uint8]()
+comptime QUOTE = UInt8(ord('"'))
+comptime COMMA = UInt8(ord(","))
+comptime LF = UInt8(ord("\n"))
+comptime CR = UInt8(ord("\r"))
+# comptime simd_width_u8 = simdwidthof[DType.uint8]()
 
 
-struct CsvTable[sep: Int = COMMA]:
+struct CsvTable[sep: UInt8 = COMMA]:
     var _inner_string: String
     var _starts: List[Int]
     var _ends: List[Int]
     var column_count: Int
 
-    fn __init__(inout self, owned s: String, with_simd: Bool = True):
+    def __init__(out self, s: String, with_simd: Bool = True):
         self._inner_string = s
         self._starts = List[Int](capacity=10)
         self._ends = List[Int](capacity=10)
         self.column_count = -1
-        if with_simd:
-            self._simd_parse()
-        else:
-            self._parse()
+        # if with_simd:
+        #     self._simd_parse()
+        # else:
+        self._parse()
 
     @always_inline
-    fn _parse(inout self):
+    def _parse(mut self):
         var length = len(self._inner_string)
         var offset = 0
         var in_double_quotes = False
         self._starts.append(offset)
         while offset < length:
-            var c = self._inner_string._buffer[offset]
+            var c = self._inner_string.unsafe_ptr()[offset]
             if c == QUOTE:
                 in_double_quotes = not in_double_quotes
                 offset += 1
-            elif not in_double_quotes and c == sep:
+            elif not in_double_quotes and c == Self.sep:
                 self._ends.append(offset)
                 offset += 1
                 self._starts.append(offset)
@@ -55,7 +55,7 @@ struct CsvTable[sep: Int = COMMA]:
                 not in_double_quotes
                 and c == CR
                 and length > offset + 1
-                and self._inner_string._buffer[offset + 1] == LF
+                and self._inner_string.unsafe_ptr()[offset + 1] == LF
             ):
                 self._ends.append(offset)
                 if self.column_count == -1:
@@ -65,58 +65,58 @@ struct CsvTable[sep: Int = COMMA]:
             else:
                 offset += 1
 
-        if self._inner_string[length - 1] == "\n":
+        if self._inner_string[byte=length - 1] == "\n":
             _ = self._starts.pop()
         else:
             self._ends.append(length)
 
-    @always_inline
-    fn _simd_parse(inout self):
-        var p = UnsafePointer(self._inner_string.unsafe_ptr())
-        var string_byte_length = len(self._inner_string)
-        var in_quotes = False
-        var last_chunk__ends_on_cr = False
-        self._starts.append(0)
+    # @always_inline
+    # fn _simd_parse(inout self):
+    #     var p = UnsafePointer(self._inner_string.unsafe_ptr())
+    #     var string_byte_length = len(self._inner_string)
+    #     var in_quotes = False
+    #     var last_chunk__ends_on_cr = False
+    #     self._starts.append(0)
 
-        @always_inline
-        @parameter
-        fn find_indicies[simd_width: Int](offset: Int):
-            var chars = p.load[width=simd_width](offset)
-            var quotes = chars == QUOTE
-            var separators = chars == sep
-            var lfs = chars == LF
-            var all_bits = quotes | separators | lfs
-            var crs = chars == CR
+    #     @always_inline
+    #     @parameter
+    #     fn find_indicies[simd_width: Int](offset: Int):
+    #         var chars = p.load[width=simd_width](offset)
+    #         var quotes = chars == QUOTE
+    #         var separators = chars == sep
+    #         var lfs = chars == LF
+    #         var all_bits = quotes | separators | lfs
+    #         var crs = chars == CR
 
-            var offsets = iota[DType.uint8, simd_width]()
-            var sp: UnsafePointer[UInt8] = stack_allocation[simd_width, UInt8]()
-            compressed_store(offsets, sp, all_bits)
-            var all_len = all_bits.reduce_bit_count()
+    #         var offsets = iota[DType.uint8, simd_width]()
+    #         var sp: UnsafePointer[UInt8] = stack_allocation[simd_width, UInt8]()
+    #         compressed_store(offsets, sp, all_bits)
+    #         var all_len = all_bits.reduce_bit_count()
 
-            for i in range(all_len):
-                var index = int(sp.load(i))
-                if quotes[index]:
-                    in_quotes = not in_quotes
-                    continue
-                if in_quotes:
-                    continue
-                var current_offset = index + offset
-                var rs_compensation: Int
-                if index > 0:
-                    rs_compensation = int(lfs[index] & crs[index - 1])
-                else:
-                    rs_compensation = int(lfs[index] & last_chunk__ends_on_cr)
-                self._ends.append(current_offset - rs_compensation)
-                self._starts.append(current_offset + 1)
-                if self.column_count == -1 and lfs[index]:
-                    self.column_count = len(self._ends)
-            last_chunk__ends_on_cr = crs[simd_width - 1]
+    #         for i in range(all_len):
+    #             var index = int(sp.load(i))
+    #             if quotes[index]:
+    #                 in_quotes = not in_quotes
+    #                 continue
+    #             if in_quotes:
+    #                 continue
+    #             var current_offset = index + offset
+    #             var rs_compensation: Int
+    #             if index > 0:
+    #                 rs_compensation = int(lfs[index] & crs[index - 1])
+    #             else:
+    #                 rs_compensation = int(lfs[index] & last_chunk__ends_on_cr)
+    #             self._ends.append(current_offset - rs_compensation)
+    #             self._starts.append(current_offset + 1)
+    #             if self.column_count == -1 and lfs[index]:
+    #                 self.column_count = len(self._ends)
+    #         last_chunk__ends_on_cr = crs[simd_width - 1]
 
-        vectorize[find_indicies, simd_width_u8](string_byte_length)
-        if self._inner_string[string_byte_length - 1] == "\n":
-            _ = self._starts.pop()
-        else:
-            self._ends.append(string_byte_length)
+    #     vectorize[find_indicies, simd_width_u8](string_byte_length)
+    #     if self._inner_string[string_byte_length - 1] == "\n":
+    #         _ = self._starts.pop()
+    #     else:
+    #         self._ends.append(string_byte_length)
 
     fn get(self, row: Int, column: Int) -> String:
         if column >= self.column_count:
@@ -127,13 +127,13 @@ struct CsvTable[sep: Int = COMMA]:
             return ""
 
         if (
-            self._inner_string[self._starts[index]] == '"'
-            and self._inner_string[self._ends[index] - 1] == '"'
+            self._inner_string[byte=self._starts[index]] == '"'
+            and self._inner_string[byte=self._ends[index] - 1] == '"'
         ):
             var start = self._starts[index] + 1
             var length = (self._ends[index] - 1) - start
-            var p1 = UnsafePointer[UInt8].alloc(length + 1)
-            memcpy(p1, self._inner_string.unsafe_ptr().offset(start), length)
+            var p1 = alloc[UInt8](length + 1)
+            memcpy(dest=p1, src=self._inner_string.unsafe_ptr() + start, count=length)
             var _inner_string = string_from_pointer(p1, length + 1)
             var quote_indices = find_indices(_inner_string, '"')
             var quotes_count = len(quote_indices)

@@ -1,12 +1,13 @@
+from std.bit import count_leading_zeros
 
-comptime Diff = SIMD[DType.int32, 4]
+comptime Diff = SIMD[DType.int16, 4]
 
 
 @always_inline
 def _to_lower(a: UInt8) -> UInt8:
     """Branch-free ASCII lowercase. Returns delta to add to the byte."""
     var is_upper = (a >= 65) & (a <= 90)
-    return UInt8(Int(is_upper) * 32)
+    return UInt8(is_upper) * 32
 
 
 @always_inline
@@ -416,53 +417,67 @@ def lower_utf8(s: String) -> String:
         A new string with all characters converted to lowercase.
     """
     var byte_len = s.byte_length()
-    var buf = List[Byte](capacity=byte_len // 2 * 3 + 1)
+    var result = String(capacity=byte_len // 2 * 3 + 1)
     var offset = 0
     var p = s.unsafe_ptr()
+    var buf = result.unsafe_ptr_mut()
+    var count = 0
     while offset < byte_len:
         var b0 = p[offset]
         # Detect UTF-8 character length from leading byte
-        var char_length: Int
-        if b0 >> 7 == 0:
-            char_length = 1
-        elif b0 >> 5 == 0b110:
-            char_length = 2
-        elif b0 >> 4 == 0b1110:
-            char_length = 3
-        else:
-            char_length = 4
-
+        # var char_length: Int
+        # if b0 >> 7 == 0:
+        #     char_length = 1
+        # elif b0 >> 5 == 0b110:
+        #     char_length = 2
+        # elif b0 >> 4 == 0b1110:
+        #     char_length = 3
+        # else:
+        #     char_length = 4
+        var char_length = Int(
+            UInt8(b0 >> 7 == 0) * 1
+            + count_leading_zeros(~b0)
+        )
         if char_length == 1:
-            buf.append(Byte(b0 + _to_lower(b0)))
+            buf[0] = (Byte(b0 + _to_lower(b0)))
+            buf += 1
+            count += 1
         elif char_length == 2:
             var b1 = p[offset + 1]
             var diff = _to_lower(b0, b1)
             var out_len = Int(diff[3])
-            buf.append(Byte(Int(b0) + Int(diff[0])))
+            buf[0] = Byte(Int16(b0) + diff[0])
             if out_len >= 2:
-                buf.append(Byte(Int(b1) + Int(diff[1])))
+                buf[1] = (Byte(Int16(b1) + diff[1]))
             if out_len >= 3:
-                buf.append(Byte(Int(diff[2])))
+                buf[2] = (Byte(diff[2]))
+            buf += out_len
+            count += out_len
         elif char_length == 3:
             var b1 = p[offset + 1]
             var b2 = p[offset + 2]
             var diff = _to_lower(b0, b1, b2)
             var out_len = Int(diff[3])
-            buf.append(Byte(Int(b0) + Int(diff[0])))
+            buf[0] = (Byte(Int16(b0) + diff[0]))
             if out_len >= 2:
-                buf.append(Byte(Int(b1) + Int(diff[1])))
+                buf[1] = (Byte(Int16(b1) + diff[1]))
             if out_len >= 3:
-                buf.append(Byte(Int(b2) + Int(diff[2])))
+                buf[2] = (Byte(Int16(b2) + diff[2]))
+            buf += out_len
+            count += out_len
         elif char_length == 4:
             var b1 = p[offset + 1]
             var b2 = p[offset + 2]
             var b3 = p[offset + 3]
             var diff = _to_lower(b0, b1, b2, b3)
-            buf.append(Byte(Int(b0) + Int(diff[0])))
-            buf.append(Byte(Int(b1) + Int(diff[1])))
-            buf.append(Byte(Int(b2) + Int(diff[2])))
-            buf.append(Byte(Int(b3) + Int(diff[3])))
+            buf[0] = (Byte(Int16(b0) + diff[0]))
+            buf[1] = (Byte(Int16(b1) + diff[1]))
+            buf[2] = (Byte(Int16(b2) + diff[2]))
+            buf[3] = (Byte(Int16(b3) + diff[3]))
+            buf += 4
+            count += 4
         offset += char_length
-
-    return String(unsafe_from_utf8=buf)
+    buf[0] = 0
+    result.resize(unsafe_uninit_length=count)
+    return result
 
