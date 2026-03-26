@@ -82,6 +82,10 @@ def bar_chart(ax, series: dict[str, dict[str, float]], title: str):
         values = [data.get(lang, 0.0) for lang in LANGS]
         offset = (i - n_bars / 2 + 0.5) * width
         bars = ax.bar(x + offset, values, width, label=label)
+        for bar, val in zip(bars, values):
+            if val > 0:
+                ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height(),
+                        f"{val:.1f}", ha="center", va="bottom", fontsize=5, rotation=90)
 
     ax.set_title(title)
     ax.set_ylabel("ns per byte")
