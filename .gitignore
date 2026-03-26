@@ -6,3 +6,4 @@
 install_id
 # rust
 rust/target/
+__pycache__

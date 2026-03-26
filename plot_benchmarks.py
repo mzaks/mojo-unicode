@@ -45,18 +45,22 @@ mojo_raw = run(["pixi", "run", "mojo", "run", "convert.mojo"],
                cwd="/home/mzaks/Work/mzaks/mojo-unicode")
 rust_raw = run(["cargo", "run", "--release"],
                cwd="/home/mzaks/Work/mzaks/mojo-unicode/rust")
+py_raw = run(["python3", "convert.py"],
+             cwd="/home/mzaks/Work/mzaks/mojo-unicode")
 
 mojo = parse_output(mojo_raw)
 rust = parse_output(rust_raw)
+py   = parse_output(py_raw)
 
 # ── Plot 1: Lower ──────────────────────────────────────────────────────────────
-# Mojo variants: Lower, Lower v2, Lower v3, Lower std  |  Rust: Lower
+# Mojo variants: Lower, Lower v2, Lower v3  |  Rust: Lower  |  Python: Lower
 lower_series = {
     "Mojo lower":     mojo.get("Lower", {}),
     "Mojo lower v2":  mojo.get("Lower v2", {}),
     "Mojo lower v3":  mojo.get("Lower v3", {}),
     # "Mojo lower std": mojo.get("Lower std", {}),
     "Rust lower":     rust.get("Lower", {}),
+    "Python lower":   py.get("Lower", {}),
 }
 
 # ── Plot 2: Upper ──────────────────────────────────────────────────────────────
@@ -64,6 +68,7 @@ upper_series = {
     "Mojo upper":     mojo.get("Upper", {}),
     # "Mojo upper std": mojo.get("Upper std", {}),
     "Rust upper":     rust.get("Upper", {}),
+    "Python upper":   py.get("Upper", {}),
 }
 
 
@@ -87,8 +92,8 @@ def bar_chart(ax, series: dict[str, dict[str, float]], title: str):
 
 
 fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 10))
-bar_chart(ax1, lower_series, "to_lower — Mojo vs Rust (ns per byte, lower is better)")
-bar_chart(ax2, upper_series, "to_upper — Mojo vs Rust (ns per byte, lower is better)")
+bar_chart(ax1, lower_series, "to_lower — Mojo vs Rust vs Python (ns per byte, lower is better)")
+bar_chart(ax2, upper_series, "to_upper — Mojo vs Rust vs Python (ns per byte, lower is better)")
 
 plt.tight_layout()
 plt.savefig("benchmark_comparison.png", dpi=150)
