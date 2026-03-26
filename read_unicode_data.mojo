@@ -1,11 +1,11 @@
 from csv import CsvTable, CsvBuilder
 
 
-fn hex_to_int(value: String) -> Int:
+def hex_to_int(value: String) -> Int:
     var multiplicator = 1
     var result = 0
     for i in range(len(value), 0, -1):
-        var c = ord(value[i - 1]) - 0x30
+        var c = ord(value[byte=i - 1]) - 0x30
         if c > 10:
             c -= 7
         result += c * multiplicator
@@ -13,15 +13,15 @@ fn hex_to_int(value: String) -> Int:
     return result
 
 
-fn push_bytes(s: String, inout builder: CsvBuilder):
+def push_bytes(s: String, mut builder: CsvBuilder):
     var ints: String = ""
     for b in s.as_bytes():
-        ints += String(b[].cast[DType.uint8]())
+        ints += String(b.cast[DType.uint8]())
         ints += " "
     builder.push(ints, False)
 
 
-fn push_diff_bytes(s: String, sd: String, inout builder: CsvBuilder):
+def push_diff_bytes(s: String, sd: String, inout builder: CsvBuilder):
     var ints: String = ""
     for i in range(len(s.as_bytes())):
         var b = s.as_bytes()[i].cast[DType.uint8]()
@@ -31,7 +31,7 @@ fn push_diff_bytes(s: String, sd: String, inout builder: CsvBuilder):
     builder.push(ints, False)
 
 
-fn main() raises:
+def main() raises:
     var conversions = CsvBuilder(
         "source hex",
         "source int",
@@ -49,7 +49,7 @@ fn main() raises:
     with open("Unicode-Data.txt", "r") as f:
         var csv_string = f.read()
         # print(csv_string)
-        var table = CsvTable[sep = ord(";")](csv_string)
+        var table = CsvTable[sep = UInt8(ord(";"))](csv_string)
         for i in range(table.row_count()):
             var upper = table.get(i, 14)
             if len(upper) > 0:

@@ -1,6 +1,7 @@
 from to_lower_v2 import lower_utf8 as lower_utf8_v2
 from to_lower_v3 import lower_utf8 as lower_utf8_v3
 from to_lower import lower_utf8
+from to_upper import upper_utf8
 from text import *
 from std.time import perf_counter_ns
 
@@ -54,6 +55,30 @@ def lower_std_lib(text: String) -> String:
     print(t"In: {(Float64(sum) / 20) / Float64(len(text))} ns per byte")
     return lower
 
+def upper(text: String) -> String:
+    var sum: UInt = 0
+    var upper = ""
+    for _ in range(20):
+        var start = perf_counter_ns()
+        upper = upper_utf8(text)
+        var end = perf_counter_ns()
+        sum += end - start
+    # print(lower)
+    print(t"In: {(Float64(sum) / 20) / Float64(len(text))} ns per byte")
+    return upper
+
+def upper_std_lib(text: String) -> String:
+    var sum: UInt = 0
+    var upper = ""
+    for _ in range(20):
+        var start = perf_counter_ns()
+        upper = text.upper()
+        var end = perf_counter_ns()
+        sum += end - start
+    # print(lower)
+    print(t"In: {(Float64(sum) / 20) / Float64(len(text))} ns per byte")
+    return upper
+
 def main():
     for t in [(text_ru, "RU"), (text_de, "DE"), (text_en, "EN"), (text_lt, "LT"), (text_gr, "GR"), (text_adlam, "Adlam"), (text_fulflude, "Fulflude"), (text_ch, "CH")]:
         _ = lower(t[0])
@@ -64,3 +89,7 @@ def main():
         print("Lower v3", t[1], "-" * 20)
         _ = lower_std_lib(t[0])
         print("Lower std", t[1], "-" * 20)
+        _ = upper(t[0])
+        print("Upper", t[1], "-" * 20)
+        _ = upper_std_lib(t[0])
+        print("Upper std", t[1], "-" * 20)

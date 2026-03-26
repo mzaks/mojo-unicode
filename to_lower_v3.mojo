@@ -424,16 +424,6 @@ def lower_utf8(s: String) -> String:
     var count = 0
     while offset < byte_len:
         var b0 = p[offset]
-        # Detect UTF-8 character length from leading byte
-        # var char_length: Int
-        # if b0 >> 7 == 0:
-        #     char_length = 1
-        # elif b0 >> 5 == 0b110:
-        #     char_length = 2
-        # elif b0 >> 4 == 0b1110:
-        #     char_length = 3
-        # else:
-        #     char_length = 4
         var char_length = Int(
             UInt8(b0 >> 7 == 0) * 1
             + count_leading_zeros(~b0)

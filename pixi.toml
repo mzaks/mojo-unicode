@@ -10,3 +10,5 @@ version = "0.1.0"
 
 [dependencies]
 mojo = "*"
+matplotlib = ">=3.10.8,<4"
+numpy = ">=2.4.3,<3"
