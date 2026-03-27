@@ -1,6 +1,6 @@
 """Test the generated decision tree to_lower against to_lower.csv."""
 
-from to_lower_v2 import lower_utf8, _to_lower, Diff
+from to_lower_v4 import lower_utf8, _to_lower, Diff
 
 
 def parse_bytes(s: String) raises -> List[Int]:

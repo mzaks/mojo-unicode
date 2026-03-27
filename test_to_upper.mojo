@@ -1,7 +1,7 @@
 """Test upper_utf8 against String.upper() using real-world text examples,
 and test individual mappings against to_upper.csv."""
 
-from to_upper import upper_utf8, _to_upper, Diff
+from to_upper_v2 import upper_utf8, _to_upper, Diff
 from text import text_ru, text_de, text_gr, text_lt, text_en, text_adlam, text_fulflude, text_ch
 
 
