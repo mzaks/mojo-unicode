@@ -1,7 +1,7 @@
 """Test the generated decision tree to_lower against to_lower.csv."""
 
 from to_lower_v4 import lower_utf8, _to_lower, Diff
-
+from text import *
 
 def parse_bytes(s: String) raises -> List[Int]:
     """Parse a space-separated byte string like '195 128' into a list of ints."""
@@ -35,166 +35,21 @@ def test_individual_mappings() raises -> Int:
         if len(fields) < 12:
             continue
 
-        var src_hex = String(fields[0])
-        var src_len = Int(String(fields[3]))
-        var src_bytes_str = String(fields[4])
-        var dst_len = Int(String(fields[8]))
-        var dst_bytes_str = String(fields[9])
-
-        var src_bytes = parse_bytes(src_bytes_str)
-        var dst_bytes = parse_bytes(dst_bytes_str)
+        var src = String(fields[2])
+        var dst = String(fields[7])
 
         tested += 1
 
-        if src_len == 1:
-            var delta = _to_lower(UInt8(src_bytes[0]))
-            var result_byte = Int(UInt8(src_bytes[0]) + delta)
-            if result_byte != dst_bytes[0]:
-                print(
-                    "FAIL 1-byte U+"
-                    + src_hex
-                    + ": got "
-                    + String(result_byte)
-                    + " expected "
-                    + String(dst_bytes[0])
-                )
-                failures += 1
-
-        elif src_len == 2:
-            var diff = _to_lower(UInt8(src_bytes[0]), UInt8(src_bytes[1]))
-            var d0 = Int(diff[0])
-            var d1 = Int(diff[1])
-            var extra = Int(diff[2])
-            var out_len = Int(diff[3])
-
-            var ok = True
-            if out_len != dst_len:
-                ok = False
-            elif out_len == 1:
-                var r0 = (src_bytes[0] + d0) & 0xFF
-                if r0 != dst_bytes[0]:
-                    ok = False
-            elif out_len == 3:
-                var r0 = (src_bytes[0] + d0) & 0xFF
-                var r1 = (src_bytes[1] + d1) & 0xFF
-                var r2 = extra & 0xFF
-                if r0 != dst_bytes[0] or r1 != dst_bytes[1] or r2 != dst_bytes[2]:
-                    ok = False
-            else:  # out_len == 2
-                var r0 = (src_bytes[0] + d0) & 0xFF
-                var r1 = (src_bytes[1] + d1) & 0xFF
-                if r0 != dst_bytes[0] or r1 != dst_bytes[1]:
-                    ok = False
-
-            if not ok:
-                print(
-                    "FAIL 2-byte U+"
-                    + src_hex
-                    + " src="
-                    + src_bytes_str
-                    + " diff=("
-                    + String(d0)
-                    + ","
-                    + String(d1)
-                    + ","
-                    + String(extra)
-                    + ","
-                    + String(out_len)
-                    + ")"
-                    + " expected dst="
-                    + dst_bytes_str
-                )
-                failures += 1
-
-        elif src_len == 3:
-            var diff = _to_lower(
-                UInt8(src_bytes[0]), UInt8(src_bytes[1]), UInt8(src_bytes[2])
+        if lower_utf8(src) != dst:
+            failures += 1
+            print(
+                "FAIL lowering"
+                + src
+                + ": got "
+                + lower_utf8(src)
+                + " expected "
+                + dst
             )
-            var d0 = Int(diff[0])
-            var d1 = Int(diff[1])
-            var d2 = Int(diff[2])
-            var out_len = Int(diff[3])
-
-            var ok = True
-            if out_len != dst_len:
-                ok = False
-            elif out_len == 1:
-                var r0 = (src_bytes[0] + d0) & 0xFF
-                if r0 != dst_bytes[0]:
-                    ok = False
-            elif out_len == 2:
-                var r0 = (src_bytes[0] + d0) & 0xFF
-                var r1 = (src_bytes[1] + d1) & 0xFF
-                if r0 != dst_bytes[0] or r1 != dst_bytes[1]:
-                    ok = False
-            else:  # out_len == 3
-                var r0 = (src_bytes[0] + d0) & 0xFF
-                var r1 = (src_bytes[1] + d1) & 0xFF
-                var r2 = (src_bytes[2] + d2) & 0xFF
-                if r0 != dst_bytes[0] or r1 != dst_bytes[1] or r2 != dst_bytes[2]:
-                    ok = False
-
-            if not ok:
-                print(
-                    "FAIL 3-byte U+"
-                    + src_hex
-                    + " src="
-                    + src_bytes_str
-                    + " diff=("
-                    + String(d0)
-                    + ","
-                    + String(d1)
-                    + ","
-                    + String(d2)
-                    + ","
-                    + String(out_len)
-                    + ")"
-                    + " expected dst="
-                    + dst_bytes_str
-                )
-                failures += 1
-
-        elif src_len == 4:
-            var diff = _to_lower(
-                UInt8(src_bytes[0]),
-                UInt8(src_bytes[1]),
-                UInt8(src_bytes[2]),
-                UInt8(src_bytes[3]),
-            )
-            var d0 = Int(diff[0])
-            var d1 = Int(diff[1])
-            var d2 = Int(diff[2])
-            var d3 = Int(diff[3])
-
-            var r0 = (src_bytes[0] + d0) & 0xFF
-            var r1 = (src_bytes[1] + d1) & 0xFF
-            var r2 = (src_bytes[2] + d2) & 0xFF
-            var r3 = (src_bytes[3] + d3) & 0xFF
-
-            if (
-                r0 != dst_bytes[0]
-                or r1 != dst_bytes[1]
-                or r2 != dst_bytes[2]
-                or r3 != dst_bytes[3]
-            ):
-                print(
-                    "FAIL 4-byte U+"
-                    + src_hex
-                    + " src="
-                    + src_bytes_str
-                    + " diff=("
-                    + String(d0)
-                    + ","
-                    + String(d1)
-                    + ","
-                    + String(d2)
-                    + ","
-                    + String(d3)
-                    + ")"
-                    + " expected dst="
-                    + dst_bytes_str
-                )
-                failures += 1
 
     print("Tested " + String(tested) + " mappings, " + String(failures) + " failures")
     return failures
@@ -237,6 +92,40 @@ def test_lower_utf8_strings() -> Int:
     return failures
 
 
+def check(label: String, text: String) -> Int:
+    var got = lower_utf8(text)
+    var expected = text.lower()
+    if got == expected:
+        print("PASS " + label)
+        return 0
+    # Find first differing character for a useful error message
+    var got_bytes = got.as_bytes()
+    var exp_bytes = expected.as_bytes()
+    var min_len = min(len(got_bytes), len(exp_bytes))
+    for i in range(min_len):
+        if got_bytes[i] != exp_bytes[i]:
+            print(
+                "FAIL "
+                + label
+                + ": first diff at byte "
+                + String(i)
+                + " got="
+                + String(Int(got_bytes[i]))
+                + " expected="
+                + String(Int(exp_bytes[i]))
+            )
+            return 1
+    print(
+        "FAIL "
+        + label
+        + ": length mismatch got="
+        + String(len(got_bytes))
+        + " expected="
+        + String(len(exp_bytes))
+    )
+    return 1
+
+
 def main() raises:
     print("=== Testing individual mappings against CSV ===")
     var mapping_failures = test_individual_mappings()
@@ -257,3 +146,19 @@ def main() raises:
         print("ALL TESTS PASSED!")
     else:
         print("TOTAL FAILURES: " + String(total))
+
+    print("=== Testing upper_utf8 on text examples ===")
+    var failures = 0
+    failures += check("Russian",  text_ru)
+    failures += check("German",   text_de)
+    failures += check("Greek",    text_gr)
+    failures += check("Latin",    text_lt)
+    failures += check("English",  text_en)
+    failures += check("Adlam",    text_adlam)
+    failures += check("Fula",     text_fulflude)
+    failures += check("Chinese",  text_ch)
+    print()
+    if failures == 0:
+        print("ALL TESTS PASSED!")
+    else:
+        print(String(failures) + " TESTS FAILED")

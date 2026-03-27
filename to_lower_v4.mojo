@@ -3,14 +3,6 @@ from std.collections.string._utf8 import _utf8_first_byte_sequence_length
 
 comptime Diff = SIMD[DType.int16, 4]
 
-
-@always_inline
-def _to_lower(a: UInt8) -> UInt8:
-    """Branch-free ASCII lowercase. Returns delta to add to the byte."""
-    var is_upper = (a >= 65) & (a <= 90)
-    return UInt8(is_upper) * 32
-
-
 @always_inline
 def _to_lower(a: UInt8, b: UInt8) -> Diff:
     """Given two bytes of a UTF-8 char, returns byte adjustments for lowercasing.
@@ -432,7 +424,7 @@ def lower_utf8(s: String) -> String:
                 var delta = is_upper.select(
                     SIMD[DType.uint8, SIMD_WIDTH](32), SIMD[DType.uint8, SIMD_WIDTH](0)
                 )
-                buf.store(vec + delta)
+                buf.store(vec ^ delta)
                 buf += SIMD_WIDTH
                 count += SIMD_WIDTH
                 offset += SIMD_WIDTH
@@ -440,7 +432,7 @@ def lower_utf8(s: String) -> String:
         var b0 = p[offset]
         var char_length = _utf8_first_byte_sequence_length(b0)
         if char_length == 1:
-            buf[0] = (Byte(b0 + _to_lower(b0)))
+            buf[0] = buf[0] = b0 ^ (Byte((b0 >= 65) & (b0 <= 90)) << 5)
             buf += 1
             count += 1
         elif char_length == 2:
@@ -448,9 +440,7 @@ def lower_utf8(s: String) -> String:
             var diff = _to_lower(b0, b1)
             var out_len = Int(diff[3])
             buf[0] = Byte(Int16(b0) + diff[0])
-            # if out_len >= 2:
             buf[1] = (Byte(Int16(b1) + diff[1]))
-            # if out_len >= 3:
             buf[2] = (Byte(diff[2]))
             buf += out_len
             count += out_len
@@ -460,9 +450,7 @@ def lower_utf8(s: String) -> String:
             var diff = _to_lower(b0, b1, b2)
             var out_len = Int(diff[3])
             buf[0] = (Byte(Int16(b0) + diff[0]))
-            # if out_len >= 2:
             buf[1] = (Byte(Int16(b1) + diff[1]))
-            # if out_len >= 3:
             buf[2] = (Byte(Int16(b2) + diff[2]))
             buf += out_len
             count += out_len
