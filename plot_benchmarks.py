@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Run Mojo and Rust benchmarks and plot the results side by side."""
 
+from pathlib import Path
+import platform
 import subprocess
 import re
 import matplotlib.pyplot as plt
@@ -42,11 +44,11 @@ def run(cmd: list[str], cwd: str | None = None) -> str:
 LANGS = ["RU", "DE", "EN", "LT", "GR", "Adlam", "Fulflude", "CH"]
 
 mojo_raw = run(["pixi", "run", "mojo", "run", "convert.mojo"],
-               cwd="/home/mzaks/Work/mzaks/mojo-unicode")
+               cwd=Path(__file__).resolve().parent)
 rust_raw = run(["cargo", "run", "--release"],
-               cwd="/home/mzaks/Work/mzaks/mojo-unicode/rust")
+               cwd=Path(__file__).resolve().parent / "rust")
 py_raw = run(["python3", "convert.py"],
-             cwd="/home/mzaks/Work/mzaks/mojo-unicode")
+             cwd=Path(__file__).resolve().parent)
 
 mojo = parse_output(mojo_raw)
 rust = parse_output(rust_raw)
@@ -102,6 +104,7 @@ bar_chart(ax1, lower_series, "to_lower — Mojo vs Rust vs Python (ns per byte, 
 bar_chart(ax2, upper_series, "to_upper — Mojo vs Rust vs Python (ns per byte, lower is better)")
 
 plt.tight_layout()
-plt.savefig("benchmark_comparison.png", dpi=150)
-print("Saved benchmark_comparison.png")
+file_name = f"benchmark_comparison_{platform.machine()}.png"
+plt.savefig(file_name, dpi=150)
+print(f"Saved {file_name}")
 plt.show()
