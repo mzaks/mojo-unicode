@@ -61,6 +61,7 @@ lower_series = {
     "Mojo lower v2":  mojo.get("Lower v2", {}),
     "Mojo lower v3":  mojo.get("Lower v3", {}),
     "Mojo lower v4":  mojo.get("Lower v4", {}),
+    "Mojo lower v5":  mojo.get("Lower v5", {}),
     # "Mojo lower std": mojo.get("Lower std", {}),
     "Rust lower":     rust.get("Lower", {}),
     "Python lower":   py.get("Lower", {}),
@@ -70,6 +71,8 @@ lower_series = {
 upper_series = {
     "Mojo upper":     mojo.get("Upper", {}),
     "Mojo upper v2":  mojo.get("Upper v2", {}),
+    "Mojo upper v3":  mojo.get("Upper v3", {}),
+    "Mojo upper v4":  mojo.get("Upper v4", {}),
     # "Mojo upper std": mojo.get("Upper std", {}),
     "Rust upper":     rust.get("Upper", {}),
     "Python upper":   py.get("Upper", {}),
