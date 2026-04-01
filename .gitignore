@@ -7,3 +7,5 @@ install_id
 # rust
 rust/target/
 __pycache__
+swift/.build
+go/unicode-bench

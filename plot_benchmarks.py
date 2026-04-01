@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run Mojo and Rust benchmarks and plot the results side by side."""
+"""Run Mojo, Rust, Swift, Go, Node.js, and Python benchmarks and plot the results side by side."""
 
 from pathlib import Path
 import platform
@@ -47,12 +47,22 @@ mojo_raw = run(["pixi", "run", "mojo", "run", "convert.mojo"],
                cwd=Path(__file__).resolve().parent)
 rust_raw = run(["cargo", "run", "--release"],
                cwd=Path(__file__).resolve().parent / "rust")
+swift_raw = run(["swift", "run", "--configuration", "release"],
+                cwd=Path(__file__).resolve().parent / "swift")
+go_dir = Path(__file__).resolve().parent / "go"
+run(["go", "build", "-o", "unicode-bench", "."], cwd=go_dir)
+go_raw = run([str(go_dir / "unicode-bench")], cwd=go_dir)
+node_raw = run(["node", "bench.js"],
+               cwd=Path(__file__).resolve().parent / "node")
 py_raw = run(["python3", "convert.py"],
              cwd=Path(__file__).resolve().parent)
 
-mojo = parse_output(mojo_raw)
-rust = parse_output(rust_raw)
-py   = parse_output(py_raw)
+mojo  = parse_output(mojo_raw)
+rust  = parse_output(rust_raw)
+swift = parse_output(swift_raw)
+go    = parse_output(go_raw)
+node  = parse_output(node_raw)
+py    = parse_output(py_raw)
 
 # ── Plot 1: Lower ──────────────────────────────────────────────────────────────
 # Mojo variants: Lower, Lower v2, Lower v3  |  Rust: Lower  |  Python: Lower
@@ -64,6 +74,9 @@ lower_series = {
     "Mojo lower v5":  mojo.get("Lower v5", {}),
     # "Mojo lower std": mojo.get("Lower std", {}),
     "Rust lower":     rust.get("Lower", {}),
+    "Swift lower":    swift.get("Lower", {}),
+    "Go lower":       go.get("Lower", {}),
+    "Node lower":     node.get("Lower", {}),
     "Python lower":   py.get("Lower", {}),
 }
 
@@ -75,6 +88,9 @@ upper_series = {
     "Mojo upper v4":  mojo.get("Upper v4", {}),
     # "Mojo upper std": mojo.get("Upper std", {}),
     "Rust upper":     rust.get("Upper", {}),
+    "Swift upper":    swift.get("Upper", {}),
+    "Go upper":       go.get("Upper", {}),
+    "Node upper":     node.get("Upper", {}),
     "Python upper":   py.get("Upper", {}),
 }
 
@@ -103,8 +119,8 @@ def bar_chart(ax, series: dict[str, dict[str, float]], title: str):
 
 
 fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 10))
-bar_chart(ax1, lower_series, "to_lower — Mojo vs Rust vs Python (ns per byte, lower is better)")
-bar_chart(ax2, upper_series, "to_upper — Mojo vs Rust vs Python (ns per byte, lower is better)")
+bar_chart(ax1, lower_series, "to_lower — Mojo vs Rust vs Swift vs Go vs Node.js vs Python (ns per byte, lower is better)")
+bar_chart(ax2, upper_series, "to_upper — Mojo vs Rust vs Swift vs Go vs Node.js vs Python (ns per byte, lower is better)")
 
 plt.tight_layout()
 file_name = f"benchmark_comparison_{platform.machine()}.png"
