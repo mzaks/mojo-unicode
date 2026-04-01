@@ -500,30 +500,42 @@ const TEXT_CH: &str = r#"
 "#;
 
 fn bench_lower(text: &str) -> f64 {
-    let mut sum: u128 = 0;
+    let mut min_ns = u128::MAX;
     let mut result = String::new();
-    for _ in 0..20 {
+    for _ in 0..100 {
         let now = Instant::now();
         result = black_box(text).to_lowercase();
-        sum += now.elapsed().as_nanos();
+        min_ns = min_ns.min(now.elapsed().as_nanos());
     }
     drop(result);
-    (sum as f64 / 20.0) / text.len() as f64
+    min_ns as f64 / text.len() as f64
 }
 
 fn bench_upper(text: &str) -> f64 {
-    let mut sum: u128 = 0;
+    let mut min_ns = u128::MAX;
     let mut result = String::new();
-    for _ in 0..20 {
+    for _ in 0..100 {
         let now = Instant::now();
         result = black_box(text).to_uppercase();
-        sum += now.elapsed().as_nanos();
+        min_ns = min_ns.min(now.elapsed().as_nanos());
     }
     drop(result);
-    (sum as f64 / 20.0) / text.len() as f64
+    min_ns as f64 / text.len() as f64
+}
+
+#[cfg(target_os = "macos")]
+fn request_performance_cores() {
+    extern "C" {
+        fn pthread_set_qos_class_self_np(qos_class: u32, relative_priority: i32) -> i32;
+    }
+    // QOS_CLASS_USER_INTERACTIVE = 0x21 → scheduler prefers P-cores
+    unsafe { pthread_set_qos_class_self_np(0x21, 0); }
 }
 
 fn main() {
+    #[cfg(target_os = "macos")]
+    request_performance_cores();
+
     let texts = [
         (TEXT_RU, "RU"),
         (TEXT_DE, "DE"),

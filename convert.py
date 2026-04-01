@@ -6,26 +6,28 @@ from text import (
 
 
 def lower(text: str) -> str:
-    total = 0
+    min_ns = float('inf')
     result = ""
-    for _ in range(20):
+    for _ in range(100):
         start = perf_counter_ns()
         result = text.lower()
-        end = perf_counter_ns()
-        total += end - start
-    print(f"In: {(total / 20) / len(text.encode())} ns per byte")
+        elapsed = perf_counter_ns() - start
+        if elapsed < min_ns:
+            min_ns = elapsed
+    print(f"In: {min_ns / len(text.encode())} ns per byte")
     return result
 
 
 def upper(text: str) -> str:
-    total = 0
+    min_ns = float('inf')
     result = ""
-    for _ in range(20):
+    for _ in range(100):
         start = perf_counter_ns()
         result = text.upper()
-        end = perf_counter_ns()
-        total += end - start
-    print(f"In: {(total / 20) / len(text.encode())} ns per byte")
+        elapsed = perf_counter_ns() - start
+        if elapsed < min_ns:
+            min_ns = elapsed
+    print(f"In: {min_ns / len(text.encode())} ns per byte")
     return result
 
 

@@ -11,142 +11,153 @@ from text import *
 from std.time import perf_counter_ns
 
 def lower(text: String) -> String:
-    var sum: UInt = 0
+    var min_ns: UInt = 0
     var lower = ""
-    for _ in range(20):
+    for i in range(100):
         var start = perf_counter_ns()
         lower = lower_utf8(text.unsafe_ptr(), len(text))
-        var end = perf_counter_ns()
-        sum += end - start
+        var elapsed = perf_counter_ns() - start
+        if i == 0 or elapsed < min_ns:
+            min_ns = elapsed
     # print(lower)
-    print(t"In: {(Float64(sum) / 20) / Float64(len(text))} ns per byte")
+    print(t"In: {Float64(min_ns) / Float64(len(text))} ns per byte")
     return lower
 
 
 def lower_v2(text: String) -> String:
-    var sum: UInt = 0
+    var min_ns: UInt = 0
     var lower = ""
-    for _ in range(20):
+    for i in range(100):
         var start = perf_counter_ns()
         lower = lower_utf8_v2(text)
-        var end = perf_counter_ns()
-        sum += end - start
+        var elapsed = perf_counter_ns() - start
+        if i == 0 or elapsed < min_ns:
+            min_ns = elapsed
     # print(lower)
-    print(t"In: {(Float64(sum) / 20) / Float64(len(text))} ns per byte")
+    print(t"In: {Float64(min_ns) / Float64(len(text))} ns per byte")
     return lower
 
 def lower_v3(text: String) -> String:
-    var sum: UInt = 0
+    var min_ns: UInt = 0
     var lower = ""
-    for _ in range(20):
+    for i in range(100):
         var start = perf_counter_ns()
         lower = lower_utf8_v3(text)
-        var end = perf_counter_ns()
-        sum += end - start
+        var elapsed = perf_counter_ns() - start
+        if i == 0 or elapsed < min_ns:
+            min_ns = elapsed
     # print(lower)
-    print(t"In: {(Float64(sum) / 20) / Float64(len(text))} ns per byte")
+    print(t"In: {Float64(min_ns) / Float64(len(text))} ns per byte")
     return lower
 
 
 def lower_v4(text: String) -> String:
-    var sum: UInt = 0
+    var min_ns: UInt = 0
     var lower = ""
-    for _ in range(20):
+    for i in range(100):
         var start = perf_counter_ns()
         lower = lower_utf8_v4(text)
-        var end = perf_counter_ns()
-        sum += end - start
+        var elapsed = perf_counter_ns() - start
+        if i == 0 or elapsed < min_ns:
+            min_ns = elapsed
     # print(lower)
-    print(t"In: {(Float64(sum) / 20) / Float64(len(text))} ns per byte")
+    print(t"In: {Float64(min_ns) / Float64(len(text))} ns per byte")
     return lower
 
 
 def lower_v5(text: String) -> String:
-    var sum: UInt = 0
+    var min_ns: UInt = 0
     var lower = ""
-    for _ in range(20):
+    for i in range(100):
         var start = perf_counter_ns()
         lower = lower_utf8_v5(text)
-        var end = perf_counter_ns()
-        sum += end - start
+        var elapsed = perf_counter_ns() - start
+        if i == 0 or elapsed < min_ns:
+            min_ns = elapsed
     # print(lower)
-    print(t"In: {(Float64(sum) / 20) / Float64(len(text))} ns per byte")
+    print(t"In: {Float64(min_ns) / Float64(len(text))} ns per byte")
     return lower
 
 
 def lower_std_lib(text: String) -> String:
-    var sum: UInt = 0
+    var min_ns: UInt = 0
     var lower = ""
-    for _ in range(20):
+    for i in range(100):
         var start = perf_counter_ns()
         lower = text.lower()
-        var end = perf_counter_ns()
-        sum += end - start
+        var elapsed = perf_counter_ns() - start
+        if i == 0 or elapsed < min_ns:
+            min_ns = elapsed
     # print(lower)
-    print(t"In: {(Float64(sum) / 20) / Float64(len(text))} ns per byte")
+    print(t"In: {Float64(min_ns) / Float64(len(text))} ns per byte")
     return lower
 
 def upper(text: String) -> String:
-    var sum: UInt = 0
+    var min_ns: UInt = 0
     var upper = ""
-    for _ in range(20):
+    for i in range(100):
         var start = perf_counter_ns()
         upper = upper_utf8(text)
-        var end = perf_counter_ns()
-        sum += end - start
+        var elapsed = perf_counter_ns() - start
+        if i == 0 or elapsed < min_ns:
+            min_ns = elapsed
     # print(lower)
-    print(t"In: {(Float64(sum) / 20) / Float64(len(text))} ns per byte")
+    print(t"In: {Float64(min_ns) / Float64(len(text))} ns per byte")
     return upper
 
 def upper_v2(text: String) -> String:
-    var sum: UInt = 0
+    var min_ns: UInt = 0
     var upper = ""
-    for _ in range(20):
+    for i in range(100):
         var start = perf_counter_ns()
         upper = upper_utf8_v2(text)
-        var end = perf_counter_ns()
-        sum += end - start
+        var elapsed = perf_counter_ns() - start
+        if i == 0 or elapsed < min_ns:
+            min_ns = elapsed
     # print(upper)
-    print(t"In: {(Float64(sum) / 20) / Float64(len(text))} ns per byte")
+    print(t"In: {Float64(min_ns) / Float64(len(text))} ns per byte")
     return upper
 
 
 def upper_v3(text: String) -> String:
-    var sum: UInt = 0
+    var min_ns: UInt = 0
     var upper = ""
-    for _ in range(20):
+    for i in range(100):
         var start = perf_counter_ns()
         upper = upper_utf8_v3(text)
-        var end = perf_counter_ns()
-        sum += end - start
+        var elapsed = perf_counter_ns() - start
+        if i == 0 or elapsed < min_ns:
+            min_ns = elapsed
     # print(upper)
-    print(t"In: {(Float64(sum) / 20) / Float64(len(text))} ns per byte")
+    print(t"In: {Float64(min_ns) / Float64(len(text))} ns per byte")
     return upper
 
 
 def upper_v4(text: String) -> String:
-    var sum: UInt = 0
+    var min_ns: UInt = 0
     var upper = ""
-    for _ in range(20):
+    for i in range(100):
         var start = perf_counter_ns()
         upper = upper_utf8_v4(text)
-        var end = perf_counter_ns()
-        sum += end - start
+        var elapsed = perf_counter_ns() - start
+        if i == 0 or elapsed < min_ns:
+            min_ns = elapsed
     # print(upper)
-    print(t"In: {(Float64(sum) / 20) / Float64(len(text))} ns per byte")
+    print(t"In: {Float64(min_ns) / Float64(len(text))} ns per byte")
     return upper
 
 
 def upper_std_lib(text: String) -> String:
-    var sum: UInt = 0
+    var min_ns: UInt = 0
     var upper = ""
-    for _ in range(20):
+    for i in range(100):
         var start = perf_counter_ns()
         upper = text.upper()
-        var end = perf_counter_ns()
-        sum += end - start
+        var elapsed = perf_counter_ns() - start
+        if i == 0 or elapsed < min_ns:
+            min_ns = elapsed
     # print(lower)
-    print(t"In: {(Float64(sum) / 20) / Float64(len(text))} ns per byte")
+    print(t"In: {Float64(min_ns) / Float64(len(text))} ns per byte")
     return upper
 
 def main():

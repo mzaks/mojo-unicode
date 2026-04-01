@@ -513,29 +513,31 @@ func nanoseconds() -> UInt64 {
 }
 
 func benchLower(_ text: String) -> Double {
-    var sum: UInt64 = 0
+    var minNs: UInt64 = UInt64.max
     var result = ""
-    for _ in 0..<20 {
+    for _ in 0..<100 {
         let start = nanoseconds()
         result = text.lowercased()
-        sum += nanoseconds() - start
+        let elapsed = nanoseconds() - start
+        if elapsed < minNs { minNs = elapsed }
     }
     _ = result
     let byteCount = text.utf8.count
-    return (Double(sum) / 20.0) / Double(byteCount)
+    return Double(minNs) / Double(byteCount)
 }
 
 func benchUpper(_ text: String) -> Double {
-    var sum: UInt64 = 0
+    var minNs: UInt64 = UInt64.max
     var result = ""
-    for _ in 0..<20 {
+    for _ in 0..<100 {
         let start = nanoseconds()
         result = text.uppercased()
-        sum += nanoseconds() - start
+        let elapsed = nanoseconds() - start
+        if elapsed < minNs { minNs = elapsed }
     }
     _ = result
     let byteCount = text.utf8.count
-    return (Double(sum) / 20.0) / Double(byteCount)
+    return Double(minNs) / Double(byteCount)
 }
 
 let texts: [(String, String)] = [

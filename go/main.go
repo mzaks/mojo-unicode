@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"time"
 )
@@ -502,27 +503,33 @@ const TEXT_CH = `
 `
 
 func benchLower(text string) float64 {
-	var sum int64
 	var result string
-	for i := 0; i < 20; i++ {
+	for i := 0; i < 100; i++ { result = strings.ToLower(text) }
+	minNs := int64(math.MaxInt64)
+	for i := 0; i < 100; i++ {
 		start := time.Now()
 		result = strings.ToLower(text)
-		sum += time.Since(start).Nanoseconds()
+		if elapsed := time.Since(start).Nanoseconds(); elapsed < minNs {
+			minNs = elapsed
+		}
 	}
 	_ = result
-	return float64(sum) / 20.0 / float64(len(text))
+	return float64(minNs) / float64(len(text))
 }
 
 func benchUpper(text string) float64 {
-	var sum int64
 	var result string
-	for i := 0; i < 20; i++ {
+	for i := 0; i < 100; i++ { result = strings.ToUpper(text) }
+	minNs := int64(math.MaxInt64)
+	for i := 0; i < 100; i++ {
 		start := time.Now()
 		result = strings.ToUpper(text)
-		sum += time.Since(start).Nanoseconds()
+		if elapsed := time.Since(start).Nanoseconds(); elapsed < minNs {
+			minNs = elapsed
+		}
 	}
 	_ = result
-	return float64(sum) / 20.0 / float64(len(text))
+	return float64(minNs) / float64(len(text))
 }
 
 func main() {

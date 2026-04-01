@@ -493,32 +493,37 @@ const TEXT_CH = `
 从此，他们幸福地生活在一起。✨
 `;
 
-const ITERS = 20;
+const WARMUP = 100;
+const ITERS = 100;
 
 function benchLower(text) {
     const byteLen = Buffer.byteLength(text, 'utf8');
-    let sum = 0n;
     let result = '';
+    for (let i = 0; i < WARMUP; i++) { result = text.toLowerCase(); }
+    let minNs = BigInt(Number.MAX_SAFE_INTEGER);
     for (let i = 0; i < ITERS; i++) {
         const start = process.hrtime.bigint();
         result = text.toLowerCase();
-        sum += process.hrtime.bigint() - start;
+        const elapsed = process.hrtime.bigint() - start;
+        if (elapsed < minNs) minNs = elapsed;
     }
     void result;
-    return Number(sum) / ITERS / byteLen;
+    return Number(minNs) / byteLen;
 }
 
 function benchUpper(text) {
     const byteLen = Buffer.byteLength(text, 'utf8');
-    let sum = 0n;
     let result = '';
+    for (let i = 0; i < WARMUP; i++) { result = text.toUpperCase(); }
+    let minNs = BigInt(Number.MAX_SAFE_INTEGER);
     for (let i = 0; i < ITERS; i++) {
         const start = process.hrtime.bigint();
         result = text.toUpperCase();
-        sum += process.hrtime.bigint() - start;
+        const elapsed = process.hrtime.bigint() - start;
+        if (elapsed < minNs) minNs = elapsed;
     }
     void result;
-    return Number(sum) / ITERS / byteLen;
+    return Number(minNs) / byteLen;
 }
 
 const texts = [

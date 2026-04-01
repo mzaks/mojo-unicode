@@ -36,19 +36,27 @@ def parse_output(output: str) -> dict[str, dict[str, float]]:
 
 
 def run(cmd: list[str], cwd: str | None = None) -> str:
+    # On Apple Silicon, use high throughput/latency tiers to prefer P-cores
+    if platform.system() == "Darwin" and platform.machine() == "arm64":
+        cmd = ["taskpolicy", "-t", "0", "-l", "0"] + cmd
     print(f"Running: {' '.join(cmd)}")
     result = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd)
+    if result.returncode != 0:
+        print(f"  [stderr] {result.stderr.strip()}")
     return result.stdout
 
 
 LANGS = ["RU", "DE", "EN", "LT", "GR", "Adlam", "Fulflude", "CH"]
 
-mojo_raw = run(["pixi", "run", "mojo", "run", "convert.mojo"],
-               cwd=Path(__file__).resolve().parent)
-rust_raw = run(["cargo", "run", "--release"],
-               cwd=Path(__file__).resolve().parent / "rust")
-swift_raw = run(["swift", "run", "--configuration", "release"],
-                cwd=Path(__file__).resolve().parent / "swift")
+mojo_dir = Path(__file__).resolve().parent
+run(["pixi", "run", "mojo", "build", "convert.mojo", "-o", "convert"], cwd=mojo_dir)
+mojo_raw = run([str(mojo_dir / "convert")], cwd=mojo_dir)
+rust_dir = Path(__file__).resolve().parent / "rust"
+run(["cargo", "build", "--release"], cwd=rust_dir)
+rust_raw = run([str(rust_dir / "target/release/rust")], cwd=rust_dir)
+swift_dir = Path(__file__).resolve().parent / "swift"
+run(["swift", "build", "--configuration", "release"], cwd=swift_dir)
+swift_raw = run([str(swift_dir / ".build/release/swift-unicode-bench")], cwd=swift_dir)
 go_dir = Path(__file__).resolve().parent / "go"
 run(["go", "build", "-o", "unicode-bench", "."], cwd=go_dir)
 go_raw = run([str(go_dir / "unicode-bench")], cwd=go_dir)
